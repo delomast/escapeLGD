@@ -1,0 +1,18 @@
+Package: escapeLGD
+Type: Package
+Title: Escapement Estimation at Lower Granite Dam 
+Version: 0.1.0
+Author: Who wrote it
+Maintainer: Thomas Delomas <thomas.delomas@idfg.idaho.gov>
+Description: More about what it does (maybe more than one line)
+    Use four spaces when indenting paragraphs within the Description.
+Imports:
+	tibble,
+	dplyr,
+	readr,
+	tidyr
+Suggests:
+	tidyverse
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
