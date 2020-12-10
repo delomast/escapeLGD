@@ -19,6 +19,20 @@ nonPBT_breakdown <- function(values, boots){
 	return(output)
 }
 
+# correcting W for HNC untagged
+# this should be optional if easy to do
+# to break down HNC, can pass phystag variable and total untagged count - should
+# have bootstraps from H,HNC,W breakdown. Then expand appropriately splitting
+# phytag and no phystag
+
+# then for wild pass the HNC estimates and subtract as appropriate
+# wild composition just has to be estimated after HNC
+
+
+# also incorporate GSI uncertainty
+
+
+
 #' estimates composition for PBT groups
 #' @param values values of the category for all the samples, a vector
 #' @param tagRates a tibble with release group in col1 and tag rate in col2
