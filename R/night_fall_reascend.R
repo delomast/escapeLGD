@@ -8,7 +8,8 @@
 #'   for nighttime passage
 #'
 #' @export
-nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, stratAssign_night, full_spillway = NULL){
+nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, stratAssign_night,
+							 boots = 2000, full_spillway = NULL){
 	# some input checking and maybe column name changes
 
 	# note that this allows different stratification for fallback by stockGroup, nighttime passage, and SCOBI
@@ -35,16 +36,10 @@ nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, strat
 	if(any(fallback_data$totalPass == 0)) stop("total of zero PIT tags passing ladder in fallback data for at least one stratum")
 	if(any(full_night$totalPass == 0)) stop("total of zero PIT tags passing ladder in nighttime passage data for at least one stratum")
 
-
-	###############
-	# Programming note
-	# p_re in fallback_rates[[1]] is really the fallback rate but is named p_re for historical reasons
-	# when the spillway data isn't used, reascend rate = fallback rate
-	###############
 	# first entry is point estimates
 	# second entry is matrix with rows as bootstrap iterations and columns corresponding
 	# to the rows of the first entry (strata and stock group)
-	fallback_rates <- list(fallback_data %>% mutate(p_re = NA))
+	fallback_rates <- list(fallback_data %>% mutate(p_fa = NA))
 	fallback_rates[[2]] <- matrix(nrow = boots, ncol = nrow(fallback_rates[[1]]))
 	for(i in 1:nrow(fallback_rates[[1]])){
 		# if no data for P(reascend|fallback) [eg no spillway data], then
@@ -52,9 +47,9 @@ nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, strat
 		if(fallback_rates[[1]]$totalFall[i] == 0){
 			warning("Assuming no fallback withOUT reascension for ", "stratum ",
 					  fallback_rates[[1]]$stratum[i], " stockGroup ", fallback_rates[[1]]$stockGroup[i])
-			fallback_rates[[1]]$p_re[i] <- fallback_rates[[1]]$numReascend[i] / fallback_rates[[1]]$totalPass[i]
+			fallback_rates[[1]]$p_fa[i] <- fallback_rates[[1]]$numReascend[i] / fallback_rates[[1]]$totalPass[i]
 			fallback_rates[[2]][,i] <- rbinom(boots, fallback_rates[[1]]$totalPass[i],
-														 fallback_rates[[1]]$p_re[i]) / fallback_rates[[1]]$totalPass[i]
+														 fallback_rates[[1]]$p_fa[i]) / fallback_rates[[1]]$totalPass[i]
 		} else { # otherwise infer both
 			opts <- optim(par = c(.1,.9), fn = optimllh, gr = gradient_fallback_log_likelihood,
 							  dfr = fallback_rates[[1]]$laterAscend[i], df = fallback_rates[[1]]$totalFall[i],
@@ -62,7 +57,7 @@ nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, strat
 							  control = list(fnscale = -1), method = "L-BFGS-B", upper = 1 - 1e-7,
 							  lower = 1e-7)
 			if(opts$convergence != 0) warning("Convergence error inferring P(fallback)")
-			fallback_rates[[1]]$p_re[i] <- opts$par[1]
+			fallback_rates[[1]]$p_fa[i] <- opts$par[1]
 
 			# bootstrap by resampling observations within each dataset (ladder_filtered and spillway_count) separately
 			# note that this gives crazy answers for some small sample sizes, like all bootstrap routines
@@ -113,7 +108,8 @@ nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, strat
 #' @param stratAssign_comp tibble with sWeek, stratum showing what stratum each sWeek corresponds to
 #'   for composition estimation using the trap data
 #' @export
-expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_comp, stratAssign_night){
+expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_comp, stratAssign_night,
+											 boots = 2000){
 
 
 	# first, expand each sWeek for wc_prop and nighttime passage
@@ -155,7 +151,11 @@ expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_c
 # now estimate composition
 # this is just going to be the function for no expanding HNC into W and no using uncertainty in GSI
 #' @export
-ascension_composition <- function(trap, stratAssign_comp, boots, HNC_W_adjust = TRUE, pbt_var = NULL, tagRates = NULL){
+ascension_composition <- function(trap, stratAssign_comp, boots = 2000,
+											 pbt_var = NULL, tagRates = NULL,
+											 H_vars, HNC_vars, W_vars){
+
+	# need check for colomn names in trap (can't include "stratum"), or special handling if it does
 
 	trap <- trap %>% left_join(stratAssign_comp, by = "sWeek")
 	allStrat <- unique(c(stratAssign_comp$stratum))
@@ -180,13 +180,13 @@ ascension_composition <- function(trap, stratAssign_comp, boots, HNC_W_adjust = 
 		# split AI into phystag and no phystag
 		tempTrap <- tempTrap %>% filter(LGDMarkAD == "AI")
 		if(nrow(tempTrap) == 0){
-			AIphystag_rates[[1]] <- AIphystag_rates[[1]] %>% bind_rows(
-				stratum = s, pPhys = 0, totalTrap = 0)
+			AIphystag_rates[[1]] <- AIphystag_rates[[1]] %>%
+				bind_rows(tibble(stratum = s, pPhys = 0, totalTrap = 0))
 			AIphystag_rates[[2]][,i] <- 0
 		} else {
-			AIphystag_rates[[1]] <- AIphystag_rates[[1]] %>% bind_rows(
-				stratum = s, pPhys = sum(tempTrap$physTag) / nrow(tempTrap),
-				totalTrap = nrow(tempTrap))
+			AIphystag_rates[[1]] <- AIphystag_rates[[1]] %>%
+				bind_rows(tibble(stratum = s, pPhys = sum(tempTrap$physTag) / nrow(tempTrap),
+				totalTrap = nrow(tempTrap)))
 			AIphystag_rates[[2]][,i] <- rbinom(boots, AIphystag_rates[[1]]$totalTrap[i],
 														  AIphystag_rates[[1]]$pPhys[i]) / AIphystag_rates[[1]]$totalTrap[i]
 		}
@@ -194,8 +194,8 @@ ascension_composition <- function(trap, stratAssign_comp, boots, HNC_W_adjust = 
 		# split no phystag into PBT-only HNC and unmarked, untagged
 		tempTrap <- tempTrap %>% filter(LGDMarkAD == "AI", !physTag)
 		if(nrow(tempTrap) == 0){
-			pbtOnly_rates[[1]] <- pbtOnly_rates[[1]] %>% bind_rows(
-				stratum = s, pPBTonly = 0, totalTrap = 0)
+			pbtOnly_rates[[1]] <- pbtOnly_rates[[1]] %>%
+				bind_rows(tibble(stratum = s, pPBTonly = 0, totalTrap = 0))
 			pbtOnly_rates[[2]][,i] <- 0
 		} else {
  			if(!any(!is.na(tempTrap$pbtAssign))){
@@ -204,9 +204,9 @@ ascension_composition <- function(trap, stratAssign_comp, boots, HNC_W_adjust = 
  			}
 			tempTrap <- tempTrap %>% filter(!is.na(pbtAssign))
 			# no PBT expansion
-			pbtOnly_rates[[1]] <- pbtOnly_rates[[1]] %>% bind_rows(
-				stratum = s, pPBTonly = sum(tempTrap$pbtAssign) / nrow(tempTrap),
-				totalTrap = nrow(tempTrap))
+			pbtOnly_rates[[1]] <- pbtOnly_rates[[1]] %>%
+				bind_rows(tibble(stratum = s, pPBTonly = sum(tempTrap$pbtAssign) / nrow(tempTrap),
+				totalTrap = nrow(tempTrap)))
 			pbtOnly_rates[[2]][,i] <- rbinom(boots, pbtOnly_rates[[1]]$totalTrap[i],
 														pbtOnly_rates[[1]]$pPBTonly[i]) / pbtOnly_rates[[1]]$totalTrap[i]
 
@@ -502,7 +502,7 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 	for(s in unique(stratAssign_comp$stratum)){ # for each stratum
 		for(sg in unique(fallback_rates[[1]]$stockGroup)){
 			fStrat <- strataMatchUp %>% filter(stratum == s, stockGroup = sg) %>% pull(fallback)
-			fBackRate <- 1 - (fallback_rates[[1]] %>% filter(stratum == fStrat, stockGroup == sg) %>% pull(p_re))
+			fBackRate <- 1 - (fallback_rates[[1]] %>% filter(stratum == fStrat, stockGroup == sg) %>% pull(p_fa))
 			# selecting column that contains bootstraps for relevant fallback rate
 			fBack_boot <- tibble(boot = (1:boots),
 										fBack = 1 - fallback_rates[[2]][,which(fallback_rates[[1]]$stratum == fStrat &
