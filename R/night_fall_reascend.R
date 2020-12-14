@@ -461,11 +461,11 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 		message("Returning a list of templates for assigning fallback rate groups")
 		return(group_tables)
 	}
-	group_tables[[1]] <- group_tables[[1]] %>%
+	group_tables[[1]] <- group_tables[[1]] %>% select(-stockGroup) %>%
 		left_join(H_groups, by = colnames(group_tables[[1]] %>% select(-stockGroup)))
-	group_tables[[2]] <- group_tables[[2]] %>%
+	group_tables[[2]] <- group_tables[[2]] %>% select(-stockGroup) %>%
 		left_join(HNC_groups, by = colnames(group_tables[[2]] %>% select(-stockGroup)))
-	group_tables[[3]] <- group_tables[[3]] %>%
+	group_tables[[3]] <- group_tables[[3]] %>% select(-stockGroup) %>%
 		left_join(W_groups, by = colnames(group_tables[[3]] %>% select(-stockGroup)))
 	for(i in 1:3){
 		if(any(is.na(group_tables[[i]]$stockGroup))){
@@ -487,6 +487,7 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 	boot_breakdown_H <- boot_breakdown %>% filter(rear == "H")
 	boot_breakdown_HNC <- boot_breakdown %>% filter(rear == "HNC")
 	boot_breakdown_W <- boot_breakdown %>% filter(rear == "W")
+	boots <- n_distinct(boot_breakdown$boot)
 	rm(boot_breakdown) # save memory
 	# removing unadjusted estimates
 	if(split_H_fallback != "var1") {
