@@ -245,7 +245,7 @@ ascension_composition <- function(trap, stratAssign_comp, boots = 2000,
 	if(length(HNC_vars) < 1 || length(H_vars) > 2) stop("HNC_vars must be one or two column names")
 	if(length(W_vars) < 1 || length(H_vars) > 2) stop("W_vars must be one or two column names")
 	for(i in 1:nrow(rear_rates[[1]])){ # for each stratum
-		s <- rear_rates$stratum[i]
+		s <- rear_rates[[1]]$stratum[i]
 		tempTrap <- trap %>% filter(stratum == s, LGDMarkAD %in% c("AD", "AI"))
 		# H subgroup proportions
 		H_break[[i]] <- subGroup_breakdown(trapStratumData = tempTrap[tempTrap$LGDMarkAD == "AD",],
