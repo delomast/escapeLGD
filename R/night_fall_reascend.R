@@ -473,7 +473,8 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 	}
 
 	# matching up strata
-	strataMatchUp <- stratAssign_comp %>% full_join(stratAssign_fallback %>% rename(fallback = stratum), by = "sWeek")
+	strataMatchUp <- stratAssign_comp %>% full_join(stratAssign_fallback %>% rename(fallback = stratum), by = "sWeek") %>%
+		select(-sWeek) %>% distinct
 
 	# now multiply fallback rates as appropriate
 
@@ -502,6 +503,7 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 	for(s in unique(stratAssign_comp$stratum)){ # for each stratum
 		for(sg in unique(fallback_rates[[1]]$stockGroup)){
 			fStrat <- strataMatchUp %>% filter(stratum == s, stockGroup == sg) %>% pull(fallback)
+			if(length(fStrat) > 1) stop("Inconclusive matchup of strata for composition and fallback.")
 			fBackRate <- 1 - (fallback_rates[[1]] %>% filter(stratum == fStrat, stockGroup == sg) %>% pull(p_fa))
 			# selecting column that contains bootstraps for relevant fallback rate
 			fBack_boot <- tibble(boot = (1:boots),
