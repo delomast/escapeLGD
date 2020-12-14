@@ -153,7 +153,7 @@ expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_c
 #' @export
 ascension_composition <- function(trap, stratAssign_comp, boots = 2000,
 											 pbt_var = NULL, tagRates = NULL,
-											 H_vars, HNC_vars, W_vars){
+											 H_vars, HNC_vars, W_vars, wc_binom){
 
 	# need check for colomn names in trap (can't include "stratum"), or special handling if it does
 
@@ -501,7 +501,7 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 
 	for(s in unique(stratAssign_comp$stratum)){ # for each stratum
 		for(sg in unique(fallback_rates[[1]]$stockGroup)){
-			fStrat <- strataMatchUp %>% filter(stratum == s, stockGroup = sg) %>% pull(fallback)
+			fStrat <- strataMatchUp %>% filter(stratum == s, stockGroup == sg) %>% pull(fallback)
 			fBackRate <- 1 - (fallback_rates[[1]] %>% filter(stratum == fStrat, stockGroup == sg) %>% pull(p_fa))
 			# selecting column that contains bootstraps for relevant fallback rate
 			fBack_boot <- tibble(boot = (1:boots),
