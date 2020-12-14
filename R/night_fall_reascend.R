@@ -249,19 +249,21 @@ ascension_composition <- function(trap, stratAssign_comp, boots = 2000,
 		tempTrap <- trap %>% filter(stratum == s, LGDMarkAD %in% c("AD", "AI"))
 		# H subgroup proportions
 		H_break[[i]] <- subGroup_breakdown(trapStratumData = tempTrap[tempTrap$LGDMarkAD == "AD",],
-													  vars = H_vars, pbt_var = pbt_var, tagRates = tagRates)
+													  vars = H_vars, pbt_var = pbt_var, tagRates = tagRates, boots = boots)
 		tempTrap <- tempTrap %>% filter(LGDMarkAD == "AI")
 
 		# don't adjust for tag rates between groups
 		# HNC subgroup proportions
 		HNC_break[[i]] <- subGroup_breakdown(trapStratumData = tempTrap[(tempTrap$physTag |
 																							  	(!is.na(tempTrap$pbtAssign) & tempTrap$pbtAssign)),],
-														 vars = HNC_vars, pbt_var = pbt_var, tagRates = tagRates)
+														 vars = HNC_vars, pbt_var = pbt_var, tagRates = tagRates,
+														 boots = boots)
 		tempTrap <- tempTrap %>% filter(!physTag)
 		if(!any(!is.na(tempTrap$pbtAssign))) tempTrap$pbtAssign <- FALSE # don't need to warn this time, already did above
 		# W subgroup proportions
 		W_break[[i]] <- subGroup_breakdown(trapStratumData = tempTrap[!is.na(tempTrap$pbtAssign) & !tempTrap$pbtAssign,],
-													  vars = W_vars, pbt_var = pbt_var, tagRates = tagRates)
+													  vars = W_vars, pbt_var = pbt_var, tagRates = tagRates,
+													  boots = boots)
 	}
 
 	# multiply through to get breakdown of ascensions

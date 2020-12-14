@@ -96,7 +96,7 @@ PBT_breakdown <- function(values, tagRates, boots){
 #'   estimates and bootstrap estimates
 #' @keywords internal
 #' @noRd
-subGroup_breakdown <- function(trapStratumData, vars, pbt_var, tagRates){
+subGroup_breakdown <- function(trapStratumData, vars, pbt_var, tagRates, boots = boots){
 	list_break <- list()
 	v1 <- vars[1]
 	v2 <- if(length(vars) == 2) vars[2] else NULL
