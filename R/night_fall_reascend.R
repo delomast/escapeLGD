@@ -32,7 +32,7 @@ nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, strat
 		if(any(!allStrat %in% fallback_data$stratum[fallback_data$stockGroup == g])) stop("not all strata are in the fallback and reascend dataset for stockGroup ", g)
 	}
 	if(any(!allStrat %in% full_night$stratum)) stop("not all strata are in the nighttime passage dataset ")
-	if(any(fallback_data$totalFall == 0)) stop("total of zero PIT tags passing ladder in fallback data for at least one stratum")
+	if(any(fallback_data$totalPass == 0)) stop("total of zero PIT tags passing ladder in fallback data for at least one stratum")
 	if(any(full_night$totalPass == 0)) stop("total of zero PIT tags passing ladder in nighttime passage data for at least one stratum")
 
 
