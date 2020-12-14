@@ -473,7 +473,7 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 	}
 
 	# matching up strata
-	strataMatchUp <- stratAssign_comp %>% full_join(stratAssign_fallback %>% mutate(fallback = stratum), by = "sWeek")
+	strataMatchUp <- stratAssign_comp %>% full_join(stratAssign_fallback %>% rename(fallback = stratum), by = "sWeek")
 
 	# now multiply fallback rates as appropriate
 
