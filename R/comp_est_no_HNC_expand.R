@@ -16,7 +16,6 @@ ascension_composition <- function(trap, stratAssign_comp, boots = 2000,
 	AIphystag_rates[[2]] <- matrix(nrow = boots, ncol = length(allStrat))
 	pbtOnly_rates <- list(tibble())
 	pbtOnly_rates[[2]] <- matrix(nrow = boots, ncol = length(allStrat))
-	seed_for_HNC_W <- c()
 	for(i in 1:length(allStrat)){ # need to make sure all strata have values for all parameters
 		s <- allStrat[i]
 		tempTrap <- trap %>% filter(stratum == s, LGDMarkAD %in% c("AD", "AI"))
