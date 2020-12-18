@@ -6,8 +6,19 @@
 HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 											pbt_var = NULL, tagRates = NULL){
 
+
+	colnames(tagRates) <- c("group", "tagRate")
+	if("Unassigned" %in% tagRates[[1]]){
+		if(tagRates[[2]][tagRates[[1]] == "Unassigned"] != 1){
+			stop("Unassigned must not be included in the tag rate file or have a tag rate of 1")
+		}
+	} else {
+		# add Unassigned with tag rate of 1
+		tagRates <- bind_rows(tagRates, tibble(group = "Unassigned", tagRate = 1))
+	}
+
 	pClip <- sum(trap$LGDMarkAD == "AD") / nrow(trap)
-	tempTrap <- tempTrap %>% filter(LGDMarkAD == "AI")
+	tempTrap <- trap %>% filter(LGDMarkAD == "AI")
 	pPhys <- sum(tempTrap$physTag) / nrow(tempTrap) # phys tag is FALSE if not assessed (NOT NA)
 
 	# split no phystag into PBT-only HNC and unmarked, untagged
@@ -73,10 +84,10 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 					assignedData <- tibble(group = tempTrap[[v1]][tempTrap[[v1]] != "Unassigned"],
 												  var2 = tempTrap[[v2]][tempTrap[[v1]] != "Unassigned"]) %>%
 						left_join(tagRates, by = "group") %>% mutate(expectUnass = (1 / tagRate) - 1) %>%
-						group_by(var2) %>% summarise(expectUnass = sum(expectUnass)) %>% select(var2, expectUnass)
+						group_by(var2) %>% summarise(expectUnass = sum(expectUnass), .groups = "drop") %>% select(var2, expectUnass)
 					props <- table(subGroupData)
 					tempEstim <- tibble(var2 = names(props), prop = as.numeric(props)) %>%
-						left_join(assignedData, by = var2) %>% mutate(expectUnass = replace_na(expectUnass, 0),
+						left_join(assignedData, by = "var2") %>% mutate(expectUnass = replace_na(expectUnass, 0),
 						prop = prop - expectUnass)
 					tempEstim$prop[tempEstim$prop < 0] <- 0 # truncate at 0
 					tempEstim <- tempEstim %>% mutate(prop = prop/sum(prop)) %>% rename(group = var2) %>% select(group, prop)
@@ -107,7 +118,7 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 	if(nrow(tempTrap) > 0){ # make sure there are HNC fish
 		# expanding and truncating as needed from the beginning
 		tempTag <- tagRates
-		colnames(tempTag)[2] <- pbt_var
+		colnames(tempTag)[1] <- pbt_var
 		tempTrap <- tempTrap %>% left_join(tempTag, by = pbt_var) %>%
 			mutate(tagRate = replace_na(tagRate, 1), exp = 1 / tagRate, diff = exp - 1)
 		rm(tempTag)
@@ -126,20 +137,22 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 
 		estim <- tibble()
 		if(v1 == pbt_var){
-			estim <- tempTrap %>% group_by(!!as.symbol(pbt_var), physTag) %>% summarise(prop = sum(exp), diff = sum(diff)) %>%
-				ungroup %>% rename(group = !!as.symbol(pbt_var)) %>% select(group, physTag, prop, diff)
+			estim <- tempTrap %>% group_by(!!as.symbol(pbt_var), physTag) %>%
+				summarise(prop = sum(exp), diff = sum(diff), .groups = "drop") %>%
+				rename(group = !!as.symbol(pbt_var)) %>% select(group, physTag, prop, diff)
 			removeUnass <- estim %>% filter(physTag) %>% pull(diff) %>% sum
 			if(!any(estim$group == "Unassigned")) estim <- estim %>% bind_rows(tibble(group = "Unassigned", physTag = TRUE, prop = 0, diff = 0))
 			# expand phystag into unassigned phystag
 			estim$prop[estim$group == "Unassigned"] <- estim$prop[estim$group == "Unassigned"] - removeUnass
-			estim <- estim %>% group_by(group) %>% summarise(prop = sum(prop)) %>% ungroup %>% mutate(prop = prop / sum(prop))
+			estim <- estim %>% group_by(group) %>% summarise(prop = sum(prop), .groups = "drop") %>% mutate(prop = prop / sum(prop))
 		} else {
 			# need to expand pbt only fish, truncating for number of wild fish
 			# don't need to expand physically tagged fish
-			estim <- tempTrap %>% group_by(!!as.symbol(v1), physTag) %>% summarise(prop = sum(exp), diff = sum(diff)) %>%
-				ungroup %>% rename(group = !!as.symbol(v1)) %>% select(group, physTag, prop, diff)
+			estim <- tempTrap %>% group_by(!!as.symbol(v1), physTag) %>%
+				summarise(prop = sum(exp), diff = sum(diff), .groups = "drop") %>%
+				 rename(group = !!as.symbol(v1)) %>% select(group, physTag, prop, diff)
 			estim$prop[estim$physTag] <- estim$prop[estim$physTag] - estim$diff[estim$physTag] # unexpanding phystag fish
-			estim <- estim %>% group_by(group) %>% summarise(prop = sum(prop)) %>% ungroup %>% mutate(prop = prop / sum(prop))
+			estim <- estim %>% group_by(group) %>% summarise(prop = sum(prop), .groups = "drop") %>% mutate(prop = prop / sum(prop))
 		}
 		# multiplying by expanded window count and other proportions then organizing output
 		estim <- estim %>% mutate(rear = "HNC", var2 = NA, prop = prop * wc_expanded * (1 - pClip) *
@@ -168,15 +181,16 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 					}
 				} else if(v2 == pbt_var){
 					# need to expand phystag and non separately
-					tempEstim <- subGroupData %>% group_by(!!as.symbol(pbt_var), physTag) %>% summarise(prop = sum(exp), diff = sum(diff)) %>%
-						ungroup %>% rename(group = !!as.symbol(pbt_var)) %>% select(group, physTag, prop, diff)
+					tempEstim <- subGroupData %>% group_by(!!as.symbol(pbt_var), physTag) %>%
+						summarise(prop = sum(exp), diff = sum(diff), .groups = "drop") %>%
+						rename(group = !!as.symbol(pbt_var)) %>% select(group, physTag, prop, diff)
 					removeUnass <- tempEstim %>% filter(physTag) %>% pull(diff) %>% sum
 					if(!any(tempEstim$group == "Unassigned")) tempEstim <- tempEstim %>%
 						bind_rows(tibble(group = "Unassigned", physTag = TRUE, prop = 0, diff = 0))
 					# expand phystag into unassigned phystag
 					tempEstim$prop[tempEstim$group == "Unassigned"] <- tempEstim$prop[tempEstim$group == "Unassigned"] - removeUnass
-					tempEstim <- tempEstim %>% group_by(group) %>% summarise(prop = sum(prop)) %>%
-						ungroup %>% mutate(prop = prop / sum(prop))
+					tempEstim <- tempEstim %>% group_by(group) %>% summarise(prop = sum(prop), .groups = "drop") %>%
+						mutate(prop = prop / sum(prop))
 				} else if(v1 == pbt_var && v1Cat == "Unassigned"){
 					# need to correct composition of Unassigned subGroup estimates for v2
 					# first sample counts in Unassigned
@@ -184,7 +198,7 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 					tempEstim <- tibble(group = names(props), prop = as.numeric(props))
 					# now expected number of phystag unassigned due to tag rates
 					tempEstim <- tempEstim %>% left_join(tempTrap %>% filter(physTag, pbtAssign) %>%
-						group_by(!!as.symbol(v2)) %>% summarise(diff = sum(diff)) %>% ungroup %>%
+						group_by(!!as.symbol(v2)) %>% summarise(diff = sum(diff), .groups = "drop") %>%
 							rename(group = !!as.symbol(v2)) %>% select(group, diff), by = "group") %>%
 						mutate(diff = replace_na(diff, 0), prop = prop - diff)
 					tempEstim$prop[tempEstim$prop < 0] <- 0 # truncate at 0
@@ -196,12 +210,13 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 				} else {
 					# neither variable is PBT variable
 					# need to expand pbt only fish, don't need to expand physically tagged fish
-					tempEstim <- subGroupData %>% group_by(!!as.symbol(v2), physTag) %>% summarise(prop = sum(exp), diff = sum(diff)) %>%
-						ungroup %>% rename(group = !!as.symbol(v2)) %>% select(group, physTag, prop, diff)
+					tempEstim <- subGroupData %>% group_by(!!as.symbol(v2), physTag) %>%
+						summarise(prop = sum(exp), diff = sum(diff), .groups = "drop") %>%
+						rename(group = !!as.symbol(v2)) %>% select(group, physTag, prop, diff)
 					tempEstim$prop[tempEstim$physTag] <- tempEstim$prop[tempEstim$physTag] -
 						tempEstim$diff[tempEstim$physTag] # unexpanding phystag fish
-					tempEstim <- tempEstim %>% group_by(group) %>% summarise(prop = sum(prop)) %>%
-						ungroup %>% mutate(prop = prop / sum(prop))
+					tempEstim <- tempEstim %>% group_by(group) %>% summarise(prop = sum(prop), .groups = "drop") %>%
+						mutate(prop = prop / sum(prop))
 				}
 
 				estim2 <- estim2 %>% bind_rows(
@@ -229,8 +244,8 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 		# no PBT for W fish!
 		props <- table(tempTrap[[v1]]) # removes NAs automatically
 		estim <- tibble(group = names(props), prop = as.numeric(props)) %>% left_join(
-			tempTrap_HNC %>% group_by(!!as.symbol(v1)) %>% summarise(diff = sum(diff)) %>%
-				rename(group = !!as.symbol(v1)) %>% ungroup,
+			tempTrap_HNC %>% group_by(!!as.symbol(v1)) %>% summarise(diff = sum(diff), .groups = "drop") %>%
+				rename(group = !!as.symbol(v1)),
 			by = "group") %>% mutate(prop = prop - diff) # subtract expanded HNC
 		estim$diff[estim$diff < 0] <- 0 # truncate at 0
 		estim <- estim %>% mutate(prop = prop / sum(prop))
@@ -256,7 +271,7 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 					props <- table(tempTrap[[v2]])
 					tempEstim <- tibble(group = names(props), prop = as.numeric(props)) %>% left_join(
 						tempTrap_HNC %>% filter(!!as.symbol(v1) == v1Cat) %>% group_by(!!as.symbol(v2))
-							%>% summarise(diff = sum(diff)) %>% rename(group = !!as.symbol(v2)) %>% ungroup,
+							%>% summarise(diff = sum(diff), .groups = "drop") %>% rename(group = !!as.symbol(v2)),
 						by = "group") %>% mutate(prop = prop - diff) # subtract expanded HNC
 					tempEstim$diff[tempEstim$diff < 0] <- 0 # truncate at 0
 					tempEstim <- tempEstim %>% mutate(prop = prop / sum(prop))
