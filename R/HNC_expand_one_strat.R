@@ -6,17 +6,6 @@
 HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 											pbt_var = NULL, tagRates = NULL){
 
-
-	colnames(tagRates) <- c("group", "tagRate")
-	if("Unassigned" %in% tagRates[[1]]){
-		if(tagRates[[2]][tagRates[[1]] == "Unassigned"] != 1){
-			stop("Unassigned must not be included in the tag rate file or have a tag rate of 1")
-		}
-	} else {
-		# add Unassigned with tag rate of 1
-		tagRates <- bind_rows(tagRates, tibble(group = "Unassigned", tagRate = 1))
-	}
-
 	pClip <- sum(trap$LGDMarkAD == "AD") / nrow(trap)
 	tempTrap <- trap %>% filter(LGDMarkAD == "AI")
 	pPhys <- sum(tempTrap$physTag) / nrow(tempTrap) # phys tag is FALSE if not assessed (NOT NA)
