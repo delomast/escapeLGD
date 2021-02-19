@@ -3,7 +3,8 @@
 #' treats GSI as known
 #' @export
 HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
-							  pbt_var, tagRates,
+							  pbt_var, timestep_var, physTag_var,
+							  adclip_var, tagRates,
 							  H_vars, HNC_vars, W_vars, wc_binom){
 	# make sure tagRates conforms
 	colnames(tagRates) <- c("group", "tagRate")
@@ -18,8 +19,28 @@ HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 
 
 	# checking inputs
+	if(length(H_vars) < 1 || length(H_vars) > 2) stop("H_vars must be one or two column names")
+	if(length(HNC_vars) < 1 || length(HNC_vars) > 2) stop("HNC_vars must be one or two column names")
+	if(length(W_vars) < 1 || length(W_vars) > 2) stop("W_vars must be one or two column names")
+	allVars <- unique(c(H_vars, HNC_vars, W_vars))
+	if(any(!allVars %in% colnames(trap))) stop("*_vars names must be column names in trap")
+	if(any(c(timestep_var, pbt_var, physTag_var, allVars) == "LGDMarkAD")) stop("LGDMarkAD is reserved for adclip_var or must not be used")
+	if(any(c(timestep_var, pbt_var, adclip_var, allVars) == "physTag")) stop("physTag is reserved for physTag_var or must not be used")
+	if(any(c(physTag_var, pbt_var, adclip_var, allVars) == "sWeek")) stop("sWeek is reserved for timestep_var or must not be used")
 
+	# check release groups in tag rate file
 
+	# select relevant columns
+	trap <- trap %>% select(all_of(c(timestep_var, pbt_var, adclip_var, physTag_var, allVars))) %>%
+		rename(LGDMarkAD = !!as.symbol(adclip_var), physTag = !!as.symbol(physTag_var), sWeek = !!as.symbol(timestep_var))
+	# make sure no reserved column names are used
+	if(any(colnames(trap) %in% c("stratum", "pbtAssign"))) stop("stratum and pbtAssign are reserved column names and must not be used as column names in trap")
+
+	# add "stratum" column to trap using stratAssign_comp and add pbtAssign
+	colnames(stratAssign_comp)[1:2]  <- c("sWeek", "stratum")
+	trap <- trap %>% mutate(pbtAssign = TRUE) %>% left_join(stratAssign_comp, by = "sWeek")
+	trap$pbtAssign[trap[[pbt_var]] == "Unassigned"] <- FALSE
+	trap$pbtAssign[is.na(trap[[pbt_var]])] <- NA
 
 
 	full_breakdown <- tibble()
@@ -81,7 +102,15 @@ HNC_expand_unkGSI <- function(trap, stratAssign_comp, boots = 2000,
 
 
 	# checking inputs
-
+	if(length(H_vars) < 1 || length(H_vars) > 2) stop("H_vars must be one or two column names")
+	if(length(HNC_vars) < 1 || length(HNC_vars) > 2) stop("HNC_vars must be one or two column names")
+	if(length(W_vars) < 1 || length(W_vars) > 2) stop("W_vars must be one or two column names")
+	allVars <- unique(c(H_vars, HNC_vars, W_vars))
+	if(any(!allVars %in% colnames(trap))) stop("*_vars names must be column names in trap")
+	if(any(c(timestep_var, pbt_var, physTag_var, allVars) == "LGDMarkAD")) stop("LGDMarkAD is reserved for adclip_var or must not be used")
+	if(any(c(timestep_var, pbt_var, adclip_var, allVars) == "physTag")) stop("physTag is reserved for physTag_var or must not be used")
+	if(any(c(physTag_var, pbt_var, adclip_var, allVars) == "sWeek")) stop("sWeek is reserved for timestep_var or must not be used")
+	if(any(!trap[[sampID]] %in% GSI_draws[[1]])) stop("all sampID in trap must be in GSI_draws")
 
 
 
