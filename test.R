@@ -18,60 +18,14 @@ est_comp <- ascension_composition(trap = trap, stratAssign_comp = stratAssign_co
 											 HNC_vars = c("releaseGroup"),
 											 W_vars = c("GenStock", "GenSex"), wc_binom = exp_wc)
 
-# test one strata function
-HNC_expand_one_strat_MLE(trap = trap, pbt_var = "releaseGroup", tagRates = bind_rows(tagRates, tibble(group = "Unassigned", tagRate = 1)),
-							H_vars = c("releaseGroup", "GenSex"),
-							HNC_vars = c("releaseGroup"),
-							W_vars = c("GenStock", "GenSex"), wc_expanded = 10000
-)
-HNC_expand_one_strat(trap = trap, pbt_var = "releaseGroup", tagRates = bind_rows(tagRates, tibble(group = "Unassigned", tagRate = 1)),
-							H_vars = c("releaseGroup", "GenSex"),
-							HNC_vars = c("releaseGroup"),
-							W_vars = c("GenStock", "GenSex"), wc_expanded = 10000
-)
-
-debugonce(HNC_expand_one_strat)
-HNC_expand_one_strat_MLE(trap = trap %>% filter(sWeek %in% (stratAssign_comp %>% filter(stratum == 1) %>% pull(sWeek)),
-														  releaseGroup != "Unassigned"),
-							pbt_var = "releaseGroup", tagRates = bind_rows(tagRates, tibble(group = "Unassigned", tagRate = 1)),
-							H_vars = c("releaseGroup", "GenSex"),
-							HNC_vars = c("releaseGroup"),
-							W_vars = c("GenStock", "GenSex"), wc_expanded = 10000
-)$estimates %>% filter(is.na(var2)) %>% as.data.frame() %>% mutate(total = round(total, 3)) %>%
-	group_by(var1) %>% summarise(total = sum(total)) %>%
-	full_join(trap %>% filter(sWeek %in% (stratAssign_comp %>% filter(stratum == 1) %>% pull(sWeek)),
-									  releaseGroup != "Unassigned") %>% count(releaseGroup) %>% rename(var1 = releaseGroup)) %>% as.data.frame()
-
-
-
-HNC_expand_one_strat(trap = trap %>% filter(sWeek %in% (stratAssign_comp %>% filter(stratum == 1) %>% pull(sWeek)),
-														  releaseGroup != "Unassigned"),
-							pbt_var = "releaseGroup", tagRates = bind_rows(tagRates, tibble(group = "Unassigned", tagRate = 1)),
-							H_vars = c("releaseGroup", "GenSex"),
-							HNC_vars = c("releaseGroup"),
-							W_vars = c("GenStock", "GenSex"), wc_expanded = 10000
-)$estimates %>% filter(is.na(total))
-
-
-est_comp <- HNC_expand(trap = trap, stratAssign_comp = stratAssign_comp, boots = 20,
+system.time(
+est_comp <- HNC_expand(trap = trap, stratAssign_comp = stratAssign_comp, boots = 0,
 							  pbt_var = "releaseGroup", timestep_var = "sWeek", physTag_var = "physTag",
 							  adclip_var = "LGDMarkAD", tagRates = tagRates,
 			  H_vars = c("releaseGroup", "GenSex"),
 			  HNC_vars = c("releaseGroup"),
-			  W_vars = c("GenStock", "GenSex"), wc_binom = exp_wc)
-sum(is.na(est_comp[[1]]$total))
-est_comp[[1]] %>% filter(is.na(total))
-
-sum(is.na(est_comp[[2]]$total))
-est_comp[[2]] %>% filter(is.na(total)) %>% pull(total) %>% unique
-est_comp[[1]] %>% filter(is.na(total)) %>% pull(total) %>% unique
-
-est_comp[[2]] %>% filter(is.na(total)) %>% count(rear, var1)
-est_comp[[1]] %>% filter(is.na(total)) %>% count(rear, var1)
-
-trap %>% filter(sWeek %in% (stratAssign_comp %>% filter(stratum == 1) %>% pull(sWeek))) %>%
-	filter(LGDMarkAD == "AD") %>% count(releaseGroup) %>% as.data.frame()
-
+			  W_vars = c("GenStock", "GenSex"), wc_binom = exp_wc, method = "MLE", testing = "manual")
+)
 
 templates <- apply_fallback_rates(breakdown = est_comp, fallback_rates = nf$fallback_rates,
 											 split_H_fallback = "var2",
@@ -93,4 +47,6 @@ est_escp <- apply_fallback_rates(breakdown = est_comp, fallback_rates = nf$fallb
 
 options(error = recover)
 options(error = NULL)
+
+
 

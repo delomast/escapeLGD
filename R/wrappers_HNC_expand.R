@@ -5,7 +5,9 @@
 HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 							  pbt_var, timestep_var, physTag_var,
 							  adclip_var, tagRates,
-							  H_vars, HNC_vars, W_vars, wc_binom){
+							  H_vars, HNC_vars, W_vars, wc_binom, method = c("Account", "MLE"), testing = c("manual", "complete", "none")){
+	method <- match.arg(method)
+	testing <- match.arg(testing)
 	# make sure tagRates conforms
 	colnames(tagRates) <- c("group", "tagRate")
 	if("Unassigned" %in% tagRates[[1]]){
@@ -46,32 +48,74 @@ HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 	full_breakdown <- tibble()
 	# point estimate
 	for(s in unique(stratAssign_comp$stratum)){
-		stratRes <- HNC_expand_one_strat(trap = trap %>% filter(stratum == s), H_vars = H_vars,
-									HNC_vars = HNC_vars,
-									W_vars = W_vars,
-									wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
-									pbt_var = pbt_var, tagRates = tagRates)
+		if(method == "Account"){
+			stratRes <- HNC_expand_one_strat(trap = trap %>% filter(stratum == s), H_vars = H_vars,
+														HNC_vars = HNC_vars,
+														W_vars = W_vars,
+														wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
+														pbt_var = pbt_var, tagRates = tagRates)
+		} else if (method == "MLE"){
+			stratRes <- HNC_expand_one_strat_MLE(trap = trap %>% filter(stratum == s), H_vars = H_vars,
+														HNC_vars = HNC_vars,
+														W_vars = W_vars,
+														wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
+														pbt_var = pbt_var, tagRates = tagRates)
+		} else {
+			stop("Error in method selection")
+		}
+		if(is.null(stratRes)) stop("Need complete cases for all quantities in stratum ", s)
 		full_breakdown <- full_breakdown %>% bind_rows(stratRes$estimates %>% mutate(stratum = s))
 	}
 
+	if(boots < 1) return(list(full_breakdown, NULL))
+
 	boot_breakdown <- tibble()
 	# bootstraps
+	skipped <- 0
+	totalIter <- 0
 	for(b in 1:boots){
 		for(s in unique(stratAssign_comp$stratum)){
-			# resample genotyped and not genotyped separately b/c genotyping is only done on a specified subsample
-			bootData <- bind_rows(trap %>% filter(stratum == s, is.na(pbtAssign)) %>%
-				sample_n(nrow(.), replace = TRUE),
-				trap %>% filter(stratum == s, !is.na(pbtAssign)) %>%
-					sample_n(nrow(.), replace = TRUE)
+			while(TRUE){
+				# resample genotyped and not genotyped separately b/c genotyping is only done on a specified subsample
+				bootData <- bind_rows(trap %>% filter(stratum == s, is.na(pbtAssign)) %>%
+											 	sample_n(nrow(.), replace = TRUE),
+											 trap %>% filter(stratum == s, !is.na(pbtAssign)) %>%
+											 	sample_n(nrow(.), replace = TRUE)
 				)
-			bootRes <- HNC_expand_one_strat(trap = bootData, H_vars = H_vars,
-														HNC_vars = HNC_vars,
-														W_vars = W_vars,
-														wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
-														pbt_var = pbt_var, tagRates = tagRates)
+				if(method == "Account"){
+					bootRes <- HNC_expand_one_strat(trap = bootData, H_vars = H_vars,
+															  HNC_vars = HNC_vars,
+															  W_vars = W_vars,
+															  wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
+															  pbt_var = pbt_var, tagRates = tagRates)
+				} else if (method == "MLE"){
+					bootRes <- HNC_expand_one_strat_MLE(trap = bootData, H_vars = H_vars,
+																	HNC_vars = HNC_vars,
+																	W_vars = W_vars,
+																	wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
+																	pbt_var = pbt_var, tagRates = tagRates)
+				} else {
+					stop("Error in method selection")
+				}
+				totalIter <- totalIter + 1
+				if(totalIter %% 100 == 0 && skipped / totalIter > .1) message((skipped / totalIter) * 100,
+					" % of iterations are being skipped due to missing complete cases. ",
+					"You may want to interrupt this function and prune observations with missing data")
+				if(!is.null(bootRes)) break
+				skipped <- skipped + 1
+			}
+
+			# make sure groups not sampled are estimated at zero
+			if(testing == "manual") bootRes$estimates <- full_breakdown %>% filter(stratum == s) %>%
+					select(rear, var1, var2) %>%
+					left_join(bootRes$estimates, by = c("rear", "var1", "var2")) %>%
+				mutate(total = replace_na(total, 0))
+
 			boot_breakdown <- boot_breakdown %>% bind_rows(bootRes$estimates %>% mutate(stratum = s, boot = b))
 		}
 	}
+	if(testing == "complete") boot_breakdown <- boot_breakdown %>% group_by(rear, stratum, var1, var2) %>%
+		complete(rear, stratum, var1, var2, boot, fill = list(total = 0))
 
 	return(list(full_breakdown, boot_breakdown))
 }
@@ -88,7 +132,8 @@ HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 HNC_expand_unkGSI <- function(trap, stratAssign_comp, boots = 2000,
 							  pbt_var, tagRates,
 							  H_vars, HNC_vars, W_vars, wc_binom,
-							  GSI_draws, n_point = 100, GSI_var){
+							  GSI_draws, n_point = 100, GSI_var, method = c("Account", "MLE")){
+	method <- match.arg(method)
 	# make sure tagRates conforms
 	colnames(tagRates) <- c("group", "tagRate")
 	if("Unassigned" %in% tagRates[[1]]){
@@ -122,35 +167,66 @@ HNC_expand_unkGSI <- function(trap, stratAssign_comp, boots = 2000,
 		# update GSI assignments
 		bootData_point[ind_matches,GSI_var] <- GSI_draws[[i+1]] # first column is ind names
 		for(s in unique(stratAssign_comp$stratum)){
-			bootRes_point <- HNC_expand_one_strat(trap = bootData_point, H_vars = H_vars,
-													  HNC_vars = HNC_vars,
-													  W_vars = W_vars,
-													  wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
-													  pbt_var = pbt_var, tagRates = tagRates)
+			if(method == "Account"){
+				bootRes_point <- HNC_expand_one_strat(trap = bootData_point, H_vars = H_vars,
+																  HNC_vars = HNC_vars,
+																  W_vars = W_vars,
+																  wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
+																  pbt_var = pbt_var, tagRates = tagRates)
+			} else if (method == "MLE"){
+				bootRes_point <- HNC_expand_one_strat_MLE(trap = bootData_point, H_vars = H_vars,
+																  HNC_vars = HNC_vars,
+																  W_vars = W_vars,
+																  wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
+																  pbt_var = pbt_var, tagRates = tagRates)
+			} else {
+				stop("Error in method selection")
+			}
+			if(is.null(bootRes_point)) stop("Need complete cases for all quantities in stratum ", s)
 			full_breakdown <- full_breakdown %>% bind_rows(bootRes$estimates %>% mutate(stratum = s, boot = i))
 		}
 	}
 	full_breakdown <- full_breakdown %>% group_by(rear, stratum, var1, var2) %>% summarise(total = mean(total))
 
+	if(boots < 1) return(list(full_breakdown, NULL))
 
 	boot_breakdown <- tibble()
 	# bootstraps
 	for(b in 1:boots){
 		for(s in unique(stratAssign_comp$stratum)){
-			# resample genotyped and not genotyped separately b/c genotyping is only done on a specified subsample
-			bootData <- bind_rows(trap %>% filter(stratum == s, is.na(pbtAssign)) %>%
-										 	sample_n(nrow(.), replace = TRUE),
-										 trap %>% filter(stratum == s, !is.na(pbtAssign)) %>%
-										 	sample_n(nrow(.), replace = TRUE)
-			)
-			# update GSI assignments
-			ind_matches <- match(GSI_draws$Ind, bootData$Ind)
-			bootData[ind_matches,GSI_var] <- GSI_draws[[b+1]] # first column is ind names
-			bootRes <- HNC_expand_one_strat(trap = bootData, H_vars = H_vars,
-													  HNC_vars = HNC_vars,
-													  W_vars = W_vars,
-													  wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
-													  pbt_var = pbt_var, tagRates = tagRates)
+			while(TRUE){
+				# resample genotyped and not genotyped separately b/c genotyping is only done on a specified subsample
+				bootData <- bind_rows(trap %>% filter(stratum == s, is.na(pbtAssign)) %>%
+											 	sample_n(nrow(.), replace = TRUE),
+											 trap %>% filter(stratum == s, !is.na(pbtAssign)) %>%
+											 	sample_n(nrow(.), replace = TRUE)
+				)
+				# update GSI assignments
+				ind_matches <- match(GSI_draws$Ind, bootData$Ind)
+				bootData[ind_matches,GSI_var] <- GSI_draws[[b+1]] # first column is ind names
+				if(method == "Account"){
+					bootRes <- HNC_expand_one_strat(trap = bootData, H_vars = H_vars,
+															  HNC_vars = HNC_vars,
+															  W_vars = W_vars,
+															  wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
+															  pbt_var = pbt_var, tagRates = tagRates)
+				} else if (method == "MLE"){
+					bootRes <- HNC_expand_one_strat_MLE(trap = bootData, H_vars = H_vars,
+																	HNC_vars = HNC_vars,
+																	W_vars = W_vars,
+																	wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
+																	pbt_var = pbt_var, tagRates = tagRates)
+				} else {
+					stop("Error in method selection")
+				}
+				totalIter <- totalIter + 1
+				if(totalIter %% 100 == 0 && skipped / totalIter > .1) message((skipped / totalIter) * 100,
+					" % of iterations are being skipped due to missing complete cases. ",
+					"You may want to interrupt this function and prune observations with missing data")
+				if(!is.null(bootRes)) break
+				skipped <- skipped + 1
+			}
+
 			boot_breakdown <- boot_breakdown %>% bind_rows(bootRes$estimates %>% mutate(stratum = s, boot = b))
 		}
 	}

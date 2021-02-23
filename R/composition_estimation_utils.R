@@ -73,7 +73,7 @@ PBT_expand_calc_MLE <- function(values, tagRates){
 	pr <- tibble(group = names(numAssign), count = as.numeric(numAssign)) %>% left_join(tagRates, by = "group")
 
 	# now MLE estimation of proportions\
-	propsMLE <- optim(par = rep(1, nrow(pr) + 1), fn = PBT_optimllh, # gr = , # need to add gradient
+	propsMLE <- optim(par = rep(1, nrow(pr) + 1), fn = PBT_optimllh, gr = PBT_grad,
 								nGroups = pr$count, nUntag = numUnassign, tagRates = pr$tagRate,
 							  control = list(fnscale = -1), method = "BFGS"
 							)
@@ -121,6 +121,35 @@ PBT_optimllh <- function(par, nGroups, nUntag, tagRates){
 									  nGroups = nGroups, nUntag = nUntag, tagRates = tagRates))
 }
 
+###
+# need to test PBT_grad and compare with numDeriv::grad
+###
+
+PBT_grad <- function(par, nGroups, nUntag, tagRates){
+	# apply softmax to translate into probabilities
+	par_prob <- softMax(par)
+	nPBT <- length(par_prob) - 1
+	pGroups <- par_prob[1:nPBT]
+	pW <- par_prob[nPBT + 1]
+	# calculate probs for multinomial
+	y <- pW + sum((1 - tagRates) * pGroups)
+
+	gr <- rep(0, length(par))
+
+	for(i in 1:(nPBT + 1)){
+		smDeriv <- -par_prob * par_prob[i]
+		smDeriv[i] <- par_prob[i] * (1 - par_prob[i])
+		gr[i] <- sum((nGroups / pGroups) * smDeriv[1:nPBT]) +
+			((nUntag / y) * (sum((1 - tagRates[1:nPBT]) * smDeriv[1:nPBT]) + smDeriv[nPBT + 1]))
+	}
+
+	# print(data.frame(an = gr,
+	# 					  num = numDeriv::grad(PBT_optimllh, par, nGroups = nGroups, nUntag = nUntag, tagRates = tagRates)) %>%
+	# 					  	mutate(diff = an - num)
+	# 					  )
+
+	return(gr)
+}
 
 
 
