@@ -121,10 +121,6 @@ PBT_optimllh <- function(par, nGroups, nUntag, tagRates){
 									  nGroups = nGroups, nUntag = nUntag, tagRates = tagRates))
 }
 
-###
-# need to test PBT_grad and compare with numDeriv::grad
-###
-
 PBT_grad <- function(par, nGroups, nUntag, tagRates){
 	# apply softmax to translate into probabilities
 	par_prob <- softMax(par)
@@ -160,7 +156,7 @@ PBT_grad <- function(par, nGroups, nUntag, tagRates){
 #' @noRd
 PBT_var2_calc_MLE <- function(v2Data, piGroup, tagRates){
 	# now MLE estimation of proportions\
-	propsMLE <- optim(par = rep(1, nrow(v2Data) * ncol(v2Data)), fn = PBT_var2_optimllh, # gr = , # need to add gradient
+	propsMLE <- optim(par = rep(1, nrow(v2Data) * ncol(v2Data)), fn = PBT_var2_optimllh, gr = PBT_var2_grad,
 							piGroup = piGroup, v2Data = v2Data, tagRates = tagRates,
 							control = list(fnscale = -1), method = "BFGS"
 					)
@@ -223,7 +219,51 @@ PBT_var2_log_likelihood <- function(varProbs, piGroup,
 	return(llh)
 }
 
+PBT_var2_grad <- function(par, piGroup, v2Data, tagRates){
 
+	gr <- rep(0, length(par))
+	nPBT <- nrow(v2Data) - 1
+
+	# apply softmax to translate into probabilities
+	varProbs <- matrix(par, nrow = nrow(v2Data), ncol = ncol(v2Data), byrow = TRUE)
+	for(i in 1:nrow(varProbs)){
+		varProbs[i,] <- softMax(varProbs[i,])
+	}
+
+	# first the tagged fish
+	pos <- 1
+	for(i in 1:nPBT){
+		for(j in 1:ncol(v2Data)){
+			gr[pos] <- sum(v2Data[i,] * (((1:ncol(v2Data)) == j) - varProbs[i,j]))
+			pos <- pos + 1
+		}
+	}
+	# gr[1:(nPBT * ncol(v2Data))] <- as.vector(t(v2Data[1:nPBT,] * (1 - varProbs[1:nPBT,])))
+
+	# now the untagged fish
+	untagProb <- piGroup
+	untagProb[1:nPBT] <- untagProb[1:nPBT] * (1 - tagRates[1:nPBT])
+	untagProb <- untagProb / sum(untagProb)
+
+	untagVarProbs <- drop(matrix(untagProb, nrow = 1) %*% varProbs)
+
+	unTagData <- v2Data[nPBT + 1,]
+	pos <- 1
+	for(p in 1:(nPBT+1)){
+		for(j in 1:ncol(v2Data)){
+			smDeriv <- varProbs[p,] * (((1:ncol(v2Data)) == j) - varProbs[p,j])
+			gr[pos] <- gr[pos] + sum((unTagData / untagVarProbs) * untagProb[p] * smDeriv)
+			pos <- pos + 1
+		}
+	}
+
+	# print(data.frame(an = gr,
+	# 					  num = numDeriv::grad(PBT_var2_optimllh, par, piGroup = piGroup, v2Data = v2Data, tagRates = tagRates)) %>%
+	# 					  	mutate(diff = an - num) %>% pull(diff) %>% mean
+	# 					  )
+
+	return(gr)
+}
 
 
 
@@ -283,7 +323,7 @@ PBT_var3_optimllh <- function(par, piGroup, tagRates, var2Probs, hnc_var3, un_co
 	for(i in 1:nrow(var3Probs)){
 		var3Probs[i,] <- softMax(var3Probs[i,])
 	}
-	return(PBT_var2_log_likelihood(var3Probs = var3Probs, piGroup = piGroup,
+	return(PBT_var3_log_likelihood(var3Probs = var3Probs, piGroup = piGroup,
 											 tagRates = tagRates, var2Probs = var2Probs,
 											 hnc_var3 = hnc_var3, un_counts = un_counts))
 }

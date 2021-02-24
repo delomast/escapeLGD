@@ -99,7 +99,6 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 
 					# now run MLE routine with known piGroup
 					varProbs <- PBT_var2_calc_MLE(v2Data = v2Data, piGroup = piGroup, tagRates = tempTagRates)
-
 					for(i in 1:nrow(varProbs)){
 						tempEstim <- bind_rows(tempEstim, tibble(var1 = rownames(varProbs)[i],
 																			  var2 = colnames(varProbs)[i],
