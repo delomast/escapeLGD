@@ -5,6 +5,16 @@ load("example_data_STHD18.rda")
 nf <- nightFall(wc = wc, full_reascend = full_reascend_flip, full_night = full_night,
 					 stratAssign_fallback = stratAssign, stratAssign_night = stratAssign,
 					 full_spillway = NULL, boots = 20)
+nightFall(wc = wc, full_reascend = full_reascend_flip, full_night = full_night,
+					 stratAssign_fallback = stratAssign, stratAssign_night = stratAssign,
+					 full_spillway = NULL, boots = 20)
+
+fake_spillway <- full_reascend_flip %>% mutate(totalFall = 5, laterAscend = 4) %>% select(sWeek, stockGroup, totalFall, laterAscend)
+nightFall(wc = wc, full_reascend = full_reascend_flip, full_night = full_night,
+			 stratAssign_fallback = stratAssign, stratAssign_night = stratAssign,
+			 full_spillway = fake_spillway, boots = 20)
+
+
 exp_wc <- expand_wc_binom_night(nightPassage_rates = nf$nightPassage_rates, wc = wc,
 										  wc_prop = 5/6, stratAssign_comp = stratAssign_comp,
 										  stratAssign_night = stratAssign, boots = 20)

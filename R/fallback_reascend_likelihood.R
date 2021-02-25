@@ -26,6 +26,20 @@ fallback_log_likelihood <- function(pf, pre_f, dfr, df, dr, dt){
 gradient_fallback_log_likelihood <- function(par, dfr, df, dr, dt){
 	pf <- par[1]
 	pre_f <- par[2]
+
+	# try(
+	# print(data.frame(an = c(
+	# 	# partial deriv with respect to pf
+	# 	(dr / pf) - (((dt - dr) * pre_f) / (1 - (pf * pre_f))),
+	# 	# partial deriv with respect to pre_f
+	# 	(dfr / pre_f) - ((df - dfr)/(1 - pre_f)) + (dr / pre_f) -
+	# 		(((dt - dr) * pf) / (1 - (pf*pre_f)))
+	# ),
+	# 					  num = numDeriv::grad(optimllh, par, dfr = dfr, df = df, dr = dr, dt = dt)) %>%
+	# 					  	mutate(diff = an - num)
+	# 					  )
+	# )
+
 	return(c(
 		# partial deriv with respect to pf
 		(dr / pf) - (((dt - dr) * pre_f) / (1 - (pf * pre_f))),

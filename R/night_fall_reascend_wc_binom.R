@@ -54,7 +54,7 @@ nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, strat
 			opts <- optim(par = c(.1,.9), fn = optimllh, gr = gradient_fallback_log_likelihood,
 							  dfr = fallback_rates[[1]]$laterAscend[i], df = fallback_rates[[1]]$totalFall[i],
 							  dr = fallback_rates[[1]]$numReascend[i], dt = fallback_rates[[1]]$totalPass[i],
-							  control = list(fnscale = -1), method = "L-BFGS-B", upper = 1 - 1e-7,
+							  control = list(fnscale = -1, maxit = 1000), method = "L-BFGS-B", upper = 1 - 1e-7,
 							  lower = 1e-7)
 			if(opts$convergence != 0) warning("Convergence error inferring P(fallback)")
 			fallback_rates[[1]]$p_fa[i] <- opts$par[1]
