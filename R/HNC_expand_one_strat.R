@@ -326,7 +326,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 				# now split into two for pbt assigned, one for Unassigned
 				hnc_var3 <- v2Data %>% filter(var1 != "Unassigned") %>% group_by(var1, var3) %>%
 					summarise(n = sum(n), .groups = "drop") %>% spread(var3, n)
-				un_counts <- v2Data %>% filter(var1 == "Unassigned") %>% select(var2, var3) %>%
+				un_counts <- v2Data %>% filter(var1 == "Unassigned") %>% select(var2, var3, n) %>%
 					spread(var3, n)
 				# make into matrices and make orders the same
 				rn_pbt <- hnc_var3$var1
@@ -338,7 +338,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 				rownames(hnc_var3) <- rn_pbt
 				hnc_var3 <- hnc_var3[, colnames(un_counts)] # make column orders the same
 
-				piGroup <- tibble(group = rn_pbt) %>% left_join(unmark_pbt_prop, by = "group") %>%
+				piGroup <- tibble(group = c(rn_pbt, "Unassigned")) %>% left_join(unmark_pbt_prop, by = "group") %>%
 					mutate(prop = prop / sum(prop)) %>% pull(prop)
 				# piGroup is now a vector of "known" proportions of each group in order of rows
 				tempTagRates <- tibble(group = rn_pbt) %>% left_join(tagRates, by = "group") %>% pull(tagRate)
@@ -354,7 +354,6 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 				# data:
 				# hnc_var3 - counts of PBT assigned in cats of var3
 				# un_counts - counts of unassigned in cats of var2 (rows) and var3 (cols)
-
 				var3Probs <- PBT_var3_calc_MLE(piGroup = piGroup, tagRates = tempTagRates,
 														 var2Probs = varProbs, hnc_var3 = hnc_var3,
 														 un_counts = un_counts)

@@ -1,47 +1,9 @@
 # functions used in estimating composition with the trap biological data
 
-#' estimates composition for a non-PBT categorical variable
-#' @param values values of the category for all the samples, a vector
-#' @param boots number of bootstrap iterations
-#' @return a list with two components: first is tibble of point estimates,
-#'   second is matrix with bootstraps. Columns are categories are in order following the
-#'   point estimates and are named accordingly. Rows are bootstrap iterations.
-#' @keywords internal
-#' @noRd
-nonPBT_breakdown <- function(values, boots){
-	props <- table(values) # removes NAs automatically
-	nam <- names(props)
-	sampleSize <- sum(props)
-	props <- as.numeric(props/sampleSize)
-	output <- list(tibble(group = nam, prop = props))
-	output[[2]] <- t(rmultinom(n = boots, size = sampleSize, prob = props)) / sampleSize
-	colnames(output[[2]]) <- nam
-	return(output)
-}
 
-#' estimates composition for PBT groups
-#' @param values values of the category for all the samples, a vector
-#' @param tagRates a tibble with release group in col1 and tag rate in col2
-#' @return returns tibble with group (release Group or Unassigned) and
-#'   prop (proportion of the stratum) columns
-#' @keywords internal
-#' @noRd
-PBT_expand_calc <- function(values, tagRates){
-	props <- table(values) # removes NAs automatically
-	pr <- tibble(group = names(props), count = as.numeric(props)) %>% left_join(tagRates, by = "group") %>%
-		mutate(expand = count / tagRate, diff = expand - count)
-	if(!"Unassigned" %in% pr$group) pr <- pr %>% bind_rows(tibble(group = "Unassigned",
-																					  count = 0, tagRate = 1, expand = 0, diff = 0))
-	# truncate expansions when not enough Unassigned
-	if((pr %>% filter(group == "Unassigned") %>% pull(count)) < sum(pr$diff)){
-		pr$diff <- (pr %>% filter(group == "Unassigned") %>% pull(count)) * (pr$diff / sum(pr$diff))
-		pr$expand <- pr$count + pr$diff
-		pr$expand[pr$group == "Unassigned"] <- 0
-	} else {
-		pr$expand[pr$group == "Unassigned"] <- pr$expand[pr$group == "Unassigned"] - sum(pr$diff)
-	}
-	return(pr %>% mutate(prop = expand / sum(expand)) %>% select(group, prop))
-}
+####
+## Maximum likelihood utility functions
+####
 
 
 #' softmax function with numerical stability
@@ -75,7 +37,7 @@ PBT_expand_calc_MLE <- function(values, tagRates){
 	# now MLE estimation of proportions\
 	propsMLE <- optim(par = rep(1, nrow(pr) + 1), fn = PBT_optimllh, gr = PBT_grad,
 								nGroups = pr$count, nUntag = numUnassign, tagRates = pr$tagRate,
-							  control = list(fnscale = -1), method = "BFGS"
+							  control = list(fnscale = -1, maxit = 1000), method = "BFGS"
 							)
 	if(propsMLE$convergence != 0) warning("Convergence error in PBT_expand_calc_MLE")
 	# apply softmax to translate into probabilities
@@ -158,7 +120,7 @@ PBT_var2_calc_MLE <- function(v2Data, piGroup, tagRates){
 	# now MLE estimation of proportions\
 	propsMLE <- optim(par = rep(1, nrow(v2Data) * ncol(v2Data)), fn = PBT_var2_optimllh, gr = PBT_var2_grad,
 							piGroup = piGroup, v2Data = v2Data, tagRates = tagRates,
-							control = list(fnscale = -1), method = "BFGS"
+							control = list(fnscale = -1, maxit = 1000), method = "BFGS"
 					)
 	if(propsMLE$convergence != 0) warning("Convergence error in PBT_var2_calc_MLE")
 	# apply softmax to translate into probabilities
@@ -210,9 +172,7 @@ PBT_var2_log_likelihood <- function(varProbs, piGroup,
 	untagProb <- piGroup
 	untagProb[1:nPBT] <- untagProb[1:nPBT] * (1 - tagRates[1:nPBT])
 	untagProb <- untagProb / sum(untagProb)
-	# untagVarProbs <- matrix(nrow = nrow(varProbs), ncol = ncol(varProbs))
-	# for(i in 1:nrow(v2Data)) untagVarProbs[i,] <- untagProb[i] * varProbs[i,]
-	# untagVarProbs <- colSums(untagVarProbs)
+
 	untagVarProbs <- drop(matrix(untagProb, nrow = 1) %*% varProbs)
 	llh <- llh + dmultinom(x = v2Data[nrow(v2Data),], prob = untagVarProbs, log = TRUE)
 
@@ -220,10 +180,8 @@ PBT_var2_log_likelihood <- function(varProbs, piGroup,
 }
 
 PBT_var2_grad <- function(par, piGroup, v2Data, tagRates){
-
 	gr <- rep(0, length(par))
 	nPBT <- nrow(v2Data) - 1
-
 	# apply softmax to translate into probabilities
 	varProbs <- matrix(par, nrow = nrow(v2Data), ncol = ncol(v2Data), byrow = TRUE)
 	for(i in 1:nrow(varProbs)){
@@ -238,7 +196,6 @@ PBT_var2_grad <- function(par, piGroup, v2Data, tagRates){
 			pos <- pos + 1
 		}
 	}
-	# gr[1:(nPBT * ncol(v2Data))] <- as.vector(t(v2Data[1:nPBT,] * (1 - varProbs[1:nPBT,])))
 
 	# now the untagged fish
 	untagProb <- piGroup
@@ -266,11 +223,6 @@ PBT_var2_grad <- function(par, piGroup, v2Data, tagRates){
 }
 
 
-
-
-
-
-
 #' MLE estimates composition for var3 within W
 #' @param piGroup "known" proportions of each group in order of rows of
 #' @param tagRates tagRates in order of piGroup
@@ -283,10 +235,10 @@ PBT_var2_grad <- function(par, piGroup, v2Data, tagRates){
 PBT_var3_calc_MLE <- function(piGroup, tagRates, var2Probs, hnc_var3, un_counts){
 	# now MLE estimation of proportions\
 	propsMLE <- optim(par = rep(1, (nrow(hnc_var3) * ncol(hnc_var3)) + (nrow(un_counts) * ncol(un_counts))),
-							fn = PBT_var3_optimllh, # gr = , # need to add gradient
+							fn = PBT_var3_optimllh, gr = PBT_var3_grad,
 							piGroup = piGroup, var2Probs = var2Probs, tagRates = tagRates,
 							hnc_var3 = hnc_var3, un_counts = un_counts,
-							control = list(fnscale = -1), method = "BFGS"
+							control = list(fnscale = -1, maxit = 1000), method = "BFGS"
 	)
 	if(propsMLE$convergence != 0) warning("Convergence error in PBT_var3_calc_MLE")
 	# apply softmax to translate into probabilities
@@ -360,7 +312,7 @@ PBT_var3_log_likelihood <- function(var3Probs, piGroup, tagRates, var2Probs,
 		for(j in 1:nPBT){
 			untagVar3Probs[i,] <- untagVar3Probs[i,] + (untagProb[j] * var2Probs[j,i] * var3Probs[j,])
 		}
-		untagVar3Probs[i,] <- untagVar3Probs[i,] + (untagProb[(nPBT+1)] * var2Probs[(nPBT+1),i] * var3Probs[(nPBT+i),])
+		untagVar3Probs[i,] <- untagVar3Probs[i,] + (untagProb[nPBT + 1] * var2Probs[nPBT + 1,i] * var3Probs[nPBT + i,])
 	}
 
 	llh <- llh + dmultinom(x = as.vector(un_counts), prob = as.vector(untagVar3Probs), log = TRUE)
@@ -369,31 +321,138 @@ PBT_var3_log_likelihood <- function(var3Probs, piGroup, tagRates, var2Probs,
 }
 
 
+PBT_var3_grad <- function(par, piGroup, tagRates, var2Probs, hnc_var3, un_counts){
+	# apply softmax to translate into probabilities
+	# these are the probabilities of var3 within the pbt groups and then
+	# within the var2 groups of the unassigned fish
+	# so, need one row for each PBT group and one for each var2 group of the Unassigned
+	# and one column for each category of var3
+	# PBT groups are first, and then cats of var2 in Unassigned
+
+	var3Probs <- matrix(par, nrow = nrow(hnc_var3) + nrow(un_counts), ncol = ncol(hnc_var3), byrow = TRUE)
+	for(i in 1:nrow(var3Probs)){
+		var3Probs[i,] <- softMax(var3Probs[i,])
+	}
+
+	gr <- rep(0, length(par))
+	nPBT <- nrow(hnc_var3)
+
+	# first the tagged fish
+	pos <- 1
+	for(i in 1:nPBT){
+		for(j in 1:ncol(var3Probs)){
+			gr[pos] <- sum(hnc_var3[i,] * (((1:ncol(var3Probs)) == j) - var3Probs[i,j]))
+			pos <- pos + 1
+		}
+	}
+
+	# then the untagged fish
+	untagProb <- piGroup
+	untagProb[1:nPBT] <- untagProb[1:nPBT] * (1 - tagRates[1:nPBT])
+	untagProb <- untagProb / sum(untagProb) # this is compostion of the Unassigned fish
+
+	# this is probabilities an unassigned fish is in cat of var2 x var3
+	untagVar3Probs <- matrix(0, nrow = nrow(un_counts), ncol = ncol(un_counts))
+	for(i in 1:nrow(un_counts)){
+		for(j in 1:nPBT){
+			untagVar3Probs[i,] <- untagVar3Probs[i,] + (untagProb[j] * var2Probs[j,i] * var3Probs[j,])
+		}
+		untagVar3Probs[i,] <- untagVar3Probs[i,] + (untagProb[nPBT + 1] * var2Probs[nPBT + 1,i] * var3Probs[nPBT + i,])
+	}
+
+	# PBT group influence
+	for(r in 1:nPBT){
+		for(c in 1:ncol(var3Probs)){
+			pos <- ((r - 1) * ncol(var3Probs)) + c
+			# for a given parameter
+			for(i1 in 1:nrow(un_counts)){
+				for(i2 in 1:ncol(un_counts)){
+					# for a given category (var2 x var3)
+					gr[pos] <- gr[pos] + (
+						(un_counts[i1,i2] / untagVar3Probs[i1,i2]) *
+							untagProb[r] * var2Probs[r,i1] *
+							var3Probs[r,i2] * ((i2 == c) - var3Probs[r,c]) # softmax derivative
+					)
+
+				}
+			}
+		}
+	}
+
+	# wild group influence
+	for(r in (nPBT+1):nrow(var3Probs)){
+		for(c in 1:ncol(var3Probs)){
+			pos <- ((r - 1) * ncol(var3Probs)) + c
+			# for a given parameter
+			for(i2 in 1:ncol(un_counts)){
+				# for a given category (var2 x var3)
+				gr[pos] <- gr[pos] + (
+					(un_counts[r - nPBT,i2] / untagVar3Probs[r - nPBT,i2]) *
+						untagProb[nPBT + 1] * var2Probs[nPBT + 1, r - nPBT] *
+						var3Probs[r,i2] * ((i2 == c) - var3Probs[r,c]) # softmax derivative
+				)
+			}
+		}
+	}
+
+	# print(data.frame(an = gr,
+	# 					  num = numDeriv::grad(PBT_var3_optimllh, par, piGroup = piGroup,
+	# 					  							tagRates = tagRates, var2Probs = var2Probs,
+	# 					  							hnc_var3 = hnc_var3, un_counts = un_counts)) %>%
+	# 					  	mutate(diff = abs(an - num)) %>% pull(diff) %>% summary
+	# 					  )
+	return(gr)
+}
+
+
+#####
+## Accounting method utility functions
+#####
 
 
 
+#' estimates composition for a non-PBT categorical variable
+#' @param values values of the category for all the samples, a vector
+#' @param boots number of bootstrap iterations
+#' @return a list with two components: first is tibble of point estimates,
+#'   second is matrix with bootstraps. Columns are categories are in order following the
+#'   point estimates and are named accordingly. Rows are bootstrap iterations.
+#' @keywords internal
+#' @noRd
+nonPBT_breakdown <- function(values, boots){
+	props <- table(values) # removes NAs automatically
+	nam <- names(props)
+	sampleSize <- sum(props)
+	props <- as.numeric(props/sampleSize)
+	output <- list(tibble(group = nam, prop = props))
+	output[[2]] <- t(rmultinom(n = boots, size = sampleSize, prob = props)) / sampleSize
+	colnames(output[[2]]) <- nam
+	return(output)
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#' estimates composition for PBT groups
+#' @param values values of the category for all the samples, a vector
+#' @param tagRates a tibble with release group in col1 and tag rate in col2
+#' @return returns tibble with group (release Group or Unassigned) and
+#'   prop (proportion of the stratum) columns
+#' @keywords internal
+#' @noRd
+PBT_expand_calc <- function(values, tagRates){
+	props <- table(values) # removes NAs automatically
+	pr <- tibble(group = names(props), count = as.numeric(props)) %>% left_join(tagRates, by = "group") %>%
+		mutate(expand = count / tagRate, diff = expand - count)
+	if(!"Unassigned" %in% pr$group) pr <- pr %>% bind_rows(tibble(group = "Unassigned",
+																					  count = 0, tagRate = 1, expand = 0, diff = 0))
+	# truncate expansions when not enough Unassigned
+	if((pr %>% filter(group == "Unassigned") %>% pull(count)) < sum(pr$diff)){
+		pr$diff <- (pr %>% filter(group == "Unassigned") %>% pull(count)) * (pr$diff / sum(pr$diff))
+		pr$expand <- pr$count + pr$diff
+		pr$expand[pr$group == "Unassigned"] <- 0
+	} else {
+		pr$expand[pr$group == "Unassigned"] <- pr$expand[pr$group == "Unassigned"] - sum(pr$diff)
+	}
+	return(pr %>% mutate(prop = expand / sum(expand)) %>% select(group, prop))
+}
 
 
 #' @param values values of the category for all the samples, a vector

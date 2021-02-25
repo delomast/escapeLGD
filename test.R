@@ -18,13 +18,16 @@ est_comp <- ascension_composition(trap = trap, stratAssign_comp = stratAssign_co
 											 HNC_vars = c("releaseGroup"),
 											 W_vars = c("GenStock", "GenSex"), wc_binom = exp_wc)
 
+# makeing categorical variable for testing
+trap <- trap %>% mutate(lenCat = ifelse(LGDFLmm > 650, "large", ifelse(LGDFLmm > 600, "medium", "small")))
+
 system.time(
 est_comp <- HNC_expand(trap = trap, stratAssign_comp = stratAssign_comp, boots = 0,
 							  pbt_var = "releaseGroup", timestep_var = "sWeek", physTag_var = "physTag",
 							  adclip_var = "LGDMarkAD", tagRates = tagRates,
 			  H_vars = c("releaseGroup", "GenSex"),
 			  HNC_vars = c("releaseGroup"),
-			  W_vars = c("GenStock", "GenSex"), wc_binom = exp_wc, method = "MLE", testing = "manual")
+			  W_vars = c("GenSex", "lenCat"), wc_binom = exp_wc, method = "MLE", testing = "manual")
 )
 
 templates <- apply_fallback_rates(breakdown = est_comp, fallback_rates = nf$fallback_rates,
