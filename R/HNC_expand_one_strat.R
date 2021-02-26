@@ -101,7 +101,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 					varProbs <- PBT_var2_calc_MLE(v2Data = v2Data, piGroup = piGroup, tagRates = tempTagRates)
 					for(i in 1:nrow(varProbs)){
 						tempEstim <- bind_rows(tempEstim, tibble(var1 = rownames(varProbs)[i],
-																			  var2 = colnames(varProbs)[i],
+																			  var2 = colnames(varProbs),
 																			  prop = varProbs[i,]))
 					}
 				}
@@ -159,9 +159,9 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 			# non - phystag
 			# expand into unmarked untagged fish (already calculated above)
 			if(nrow(unmark_pbt_prop) > 0){
-				estim <- bind_rows(estim, unmark_pbt_prop %>%
-						mutate(total = prop * wc_expanded * (1 - pClip) * (1 - pPhys) * pPBTonly) %>%
-						filter(group != "Unassigned") # Unassigned here is wild
+				estim <- bind_rows(estim, unmark_pbt_prop %>% filter(group != "Unassigned") %>% # Unassigned here is wild
+						mutate(prop = prop / sum(prop),
+								 total = prop * wc_expanded * (1 - pClip) * (1 - pPhys) * pPBTonly)
 					) %>% group_by(group) %>% summarise(total = sum(total), .groups = "drop") %>% select(group, total)
 			} else if(((1 - pPhys) * pPBTonly) > 0){
 				# missing data issues, skip this bootstrap or throw an error
@@ -486,12 +486,15 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 					props <- table(subGroupData)
 					tempEstim <- tibble(group = names(props), prop = as.numeric(props/sum(props)))
 				}
-				estim2 <- estim2 %>% bind_rows(
-					# ifelse prevents NaN from division by 0
-					tempEstim %>% mutate(prop = ifelse(estim$total[i] == 0, 0, prop * estim$total[i]), # multiply proportion by total number of fish
-												rear = "H", var1 = v1Cat) %>%
+				if(estim$total[i] == 0){
+					tempEstim <- tempEstim %>% mutate(prop = 0, rear = "H", var1 = v1Cat) %>%
 						rename(var2 = group, total = prop) %>% select(rear, var1, var2, total)
-				)
+				} else {
+					tempEstim <- tempEstim %>% mutate(prop = prop * estim$total[i], # multiply proportion by total number of fish
+																 rear = "H", var1 = v1Cat) %>%
+						rename(var2 = group, total = prop) %>% select(rear, var1, var2, total)
+				}
+				estim2 <- estim2 %>% bind_rows(tempEstim)
 			}
 			estimates <- estimates %>% bind_rows(estim2)
 		}
@@ -614,11 +617,15 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 					tempEstim <- tempEstim %>% group_by(group) %>% summarise(prop = sum(prop), .groups = "drop") %>%
 						mutate(prop = prop / sum(prop))
 				}
-
-				estim2 <- estim2 %>% bind_rows(
-					tempEstim %>% mutate(prop = ifelse(estim$total[i] == 0, 0, prop * estim$total[i]), # multiply proportion by total number of fish
-												rear = "HNC", var1 = v1Cat) %>%
-						rename(var2 = group, total = prop) %>% select(rear, var1, var2, total))
+				if(estim$total[i] == 0){
+					tempEstim <- tempEstim %>% mutate(prop = 0, rear = "HNC", var1 = v1Cat) %>%
+						rename(var2 = group, total = prop) %>% select(rear, var1, var2, total)
+				} else {
+					tempEstim <- tempEstim %>% mutate(prop = prop * estim$total[i], # multiply proportion by total number of fish
+																 rear = "HNC", var1 = v1Cat) %>%
+						rename(var2 = group, total = prop) %>% select(rear, var1, var2, total)
+				}
+				estim2 <- estim2 %>% bind_rows(tempEstim)
 			}
 			estimates <- estimates %>% bind_rows(estim2)
 		}
@@ -667,7 +674,7 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 					#  b/c no data to estimate composition of this subgroup (all samples are missing data)
 					return(NULL)
 				} else {
-					props <- table(tempTrap[[v2]])
+					props <- table(subGroupData[[v2]])
 					tempEstim <- tibble(group = names(props), prop = as.numeric(props))
 					if(nrow(tempTrap_HNC) > 0){
 						tempEstim <- tempEstim %>% left_join(
@@ -679,10 +686,16 @@ HNC_expand_one_strat <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded,
 					tempEstim <- tempEstim %>% mutate(prop = prop / sum(prop))
 				}
 
-				estim2 <- estim2 %>% bind_rows(
-					tempEstim %>% mutate(prop = ifelse(estim$total[i] == 0, 0, prop * estim$total[i]), # multiply proportion by total number of fish
-												rear = "W", var1 = v1Cat) %>%
-						rename(var2 = group, total = prop) %>% select(rear, var1, var2, total))
+				if(estim$total[i] == 0){
+					tempEstim <- tempEstim %>% mutate(prop = 0, rear = "W", var1 = v1Cat) %>%
+						rename(var2 = group, total = prop) %>% select(rear, var1, var2, total)
+				} else {
+					tempEstim <- tempEstim %>% mutate(prop = prop * estim$total[i], # multiply proportion by total number of fish
+																 rear = "W", var1 = v1Cat) %>%
+						rename(var2 = group, total = prop) %>% select(rear, var1, var2, total)
+				}
+
+				estim2 <- estim2 %>% bind_rows(tempEstim)
 			}
 			estimates <- estimates %>% bind_rows(estim2)
 		}
