@@ -336,7 +336,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 				rownames(un_counts) <- rn_v2
 				hnc_var3 <- hnc_var3 %>% select(-var1) %>% as.matrix()
 				rownames(hnc_var3) <- rn_pbt
-				hnc_var3 <- hnc_var3[, colnames(un_counts)] # make column orders the same
+				hnc_var3 <- hnc_var3[, colnames(un_counts), drop = FALSE] # make column orders the same
 
 				piGroup <- tibble(group = c(rn_pbt, "Unassigned")) %>% left_join(unmark_pbt_prop, by = "group") %>%
 					mutate(prop = prop / sum(prop)) %>% pull(prop)

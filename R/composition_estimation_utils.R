@@ -244,7 +244,7 @@ PBT_var3_calc_MLE <- function(piGroup, tagRates, var2Probs, hnc_var3, un_counts)
 	# apply softmax to translate into probabilities
 	var3Probs <- matrix(propsMLE$par, nrow = nrow(hnc_var3) + nrow(un_counts), ncol = ncol(hnc_var3), byrow = TRUE)
 	# don't need HNC values
-	var3Probs <- var3Probs[(nrow(hnc_var3) + 1):nrow(var3Probs),]
+	var3Probs <- var3Probs[(nrow(hnc_var3) + 1):nrow(var3Probs),,drop = FALSE]
 	for(i in 1:nrow(var3Probs)){
 		var3Probs[i,] <- softMax(var3Probs[i,])
 	}
