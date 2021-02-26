@@ -1,6 +1,10 @@
 # wrappers for HNC expand and variable GSI
 
 #' treats GSI as known
+#' @import dplyr
+#' @import tibble
+#' @import readr
+#' @import tidyr
 #' @export
 HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 							  pbt_var, timestep_var, physTag_var,

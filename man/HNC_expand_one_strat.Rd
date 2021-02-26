@@ -2,7 +2,7 @@
 % Please edit documentation in R/HNC_expand_one_strat.R
 \name{HNC_expand_one_strat}
 \alias{HNC_expand_one_strat}
-\title{one stratum, one dataset composition estimation}
+\title{one stratum, one dataset composition estimation, accounting}
 \usage{
 HNC_expand_one_strat(
   trap,
@@ -18,5 +18,5 @@ HNC_expand_one_strat(
 \item{trap}{data for ONE stratum}
 }
 \description{
-one stratum, one dataset composition estimation
+one stratum, one dataset composition estimation, accounting
 }
