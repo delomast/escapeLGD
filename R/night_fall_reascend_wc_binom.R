@@ -2,18 +2,21 @@
 
 #'
 #' estimate fallback, reascension, and nighttime passage
+#' @param full_reascend tibble with sWeek, stockGroup, numReascend, totalPass
+#' @param full_night tibble with sWeek, nightPass, totalPass
 #' @param stratAssign_fallback tibble with sWeek, stockGroup, stratum showing what stratum each sWeek
 #'   corresponds to for each stockGroup
 #' @param stratAssign_night tibble with sWeek, stratum showing what stratum each sWeek corresponds to
 #'   for nighttime passage
 #'
 #' @export
-nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, stratAssign_night,
+nightFall <- function(full_reascend, full_night, stratAssign_fallback, stratAssign_night,
 							 boots = 2000, full_spillway = NULL){
 	# some input checking and maybe column name changes
 
+
 	# note that this allows different stratification for fallback by stockGroup, nighttime passage, and SCOBI
-	# only constraint is that strata changes in fallback by stockGroup must coincide with strata changes in SCOBI
+	# only constraint is that strata changes in fallback by stockGroup must coincide with strata changes in stratAssign_comp
 
 	full_reascend <- full_reascend %>% left_join(stratAssign_fallback, by = c("sWeek", "stockGroup")) %>%
 		group_by(stockGroup, stratum) %>% summarise(numReascend = sum(numReascend), totalPass = sum(totalPass))
@@ -27,12 +30,7 @@ nightFall <- function(wc, full_reascend, full_night, stratAssign_fallback, strat
 		fallback_data <- full_reascend %>% mutate(totalFall = 0, laterAscend = 0)
 	}
 
-	# make sure all strata are present and nonzero totals
-	allStrat <- unique(c(stratAssign_fallback$stratum, stratAssign_night$stratum))
-	for(g in unique(fallback_data$stockGroup)){
-		if(any(!allStrat %in% fallback_data$stratum[fallback_data$stockGroup == g])) stop("not all strata are in the fallback and reascend dataset for stockGroup ", g)
-	}
-	if(any(!allStrat %in% full_night$stratum)) stop("not all strata are in the nighttime passage dataset ")
+	# make sure all totals are nonzero
 	if(any(fallback_data$totalPass == 0)) stop("total of zero PIT tags passing ladder in fallback data for at least one stratum")
 	if(any(full_night$totalPass == 0)) stop("total of zero PIT tags passing ladder in nighttime passage data for at least one stratum")
 
