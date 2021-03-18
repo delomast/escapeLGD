@@ -16,9 +16,9 @@ expand_wc_binom_night(
 \arguments{
 \item{nightPassage_rates}{one of the outputs of \code{nightFall}}
 
-\item{wc}{tibble with two columns sWeek and count of fish (NOT expanded for wc_prop)}
+\item{wc}{tibble with two columns sWeek and wc. sWeek is statistical week and wc is the count of fish (NOT expanded for wc_prop)}
 
-\item{wc_prop}{the proportion of the time fish are counted}
+\item{wc_prop}{the proportion of the time fish are counted (e.g. 5/6)}
 
 \item{stratAssign_comp}{tibble with sWeek, stratum showing what stratum each sWeek corresponds to
 for composition estimation using the trap data}

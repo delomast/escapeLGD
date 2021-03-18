@@ -2,7 +2,10 @@
 
 #'
 #' estimate fallback, reascension, and nighttime passage
-#' @param full_reascend tibble with sWeek, stockGroup, numReascend, totalPass
+#' @param full_reascend tibble with sWeek, stockGroup, numReascend, totalPass. sWeek is statistical week
+#'   stockGroup is the stockGroup (fallback/reascension rates different between stock groups), numReascend is either the
+#'   number of PITs ascending that were reascensions in that sWeek or the number of PITs ascending that later
+#'   reascended (if using spillway data it MUST be the second)
 #' @param full_night tibble with sWeek, nightPass, totalPass
 #' @param stratAssign_fallback tibble with sWeek, stockGroup, stratum showing what stratum each sWeek
 #'   corresponds to for each stockGroup
@@ -12,7 +15,17 @@
 #' @export
 nightFall <- function(full_reascend, full_night, stratAssign_fallback, stratAssign_night,
 							 boots = 2000, full_spillway = NULL){
-	# some input checking and maybe column name changes
+	# some input checking
+	if(ncol(full_reascend) != 4 || sum(c("sWeek", "stockGroup", "numReascend", "totalPass") %in%
+		colnames(full_reascend)) != 4) stop("full_reascend must have 4 columns named: sWeek, stockGroup, numReascend, totalPass")
+	if(ncol(full_night) != 3 || sum(c("sWeek", "nightPass", "totalPass") %in%
+		colnames(full_night)) != 3) stop("full_night must have 3 columns named: sWeek, nightPass, totalPass")
+	if(ncol(stratAssign_fallback) != 3 || sum(c("sWeek", "stockGroup", "stratum") %in%
+		colnames(stratAssign_fallback)) != 3) stop("stratAssign_fallback must have 3 columns named: sWeek, stockGroup, stratum")
+	if(ncol(stratAssign_night) != 2 || sum(c("sWeek", "stratum") %in%
+		colnames(stratAssign_night)) != 2) stop("stratAssign_night must have 2 columns named: sWeek, stratum")
+	if(!is.null(full_spillway) && (ncol(full_spillway) != 4 || sum(c("sWeek", "stockGroup", "laterAscend", "totalFall") %in%
+		colnames(full_spillway)) != 2)) stop("full_spillway must have 4 columns named: sWeek, stockGroup, laterAscend, totalFall")
 
 
 	# note that this allows different stratification for fallback by stockGroup, nighttime passage, and SCOBI
@@ -43,7 +56,7 @@ nightFall <- function(full_reascend, full_night, stratAssign_fallback, stratAssi
 		# if no data for P(reascend|fallback) [eg no spillway data], then
 		# assume P(reascend|fallback) = 1 [eg no fallback w/o reascension]
 		if(fallback_rates[[1]]$totalFall[i] == 0){
-			warning("Assuming no fallback withOUT reascension for ", "stratum ",
+			message("Assuming no fallback withOUT reascension for ", "stratum ",
 					  fallback_rates[[1]]$stratum[i], " stockGroup ", fallback_rates[[1]]$stockGroup[i])
 			fallback_rates[[1]]$p_fa[i] <- fallback_rates[[1]]$numReascend[i] / fallback_rates[[1]]$totalPass[i]
 			fallback_rates[[2]][,i] <- rbinom(boots, fallback_rates[[1]]$totalPass[i],
@@ -99,8 +112,8 @@ nightFall <- function(full_reascend, full_night, stratAssign_fallback, stratAssi
 
 #' estimate and bootstrap window count as a binomial and expanding for nighttime passage
 #' @param nightPassage_rates one of the outputs of \code{nightFall}
-#' @param wc tibble with two columns sWeek and count of fish (NOT expanded for wc_prop)
-#' @param wc_prop the proportion of the time fish are counted
+#' @param wc tibble with two columns sWeek and wc. sWeek is statistical week and wc is the count of fish (NOT expanded for wc_prop)
+#' @param wc_prop the proportion of the time fish are counted (e.g. 5/6)
 #' @param stratAssign_night tibble with sWeek, stratum showing what stratum each sWeek corresponds to
 #'   for nighttime passage
 #' @param stratAssign_comp tibble with sWeek, stratum showing what stratum each sWeek corresponds to
@@ -108,8 +121,13 @@ nightFall <- function(full_reascend, full_night, stratAssign_fallback, stratAssi
 #' @export
 expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_comp, stratAssign_night,
 											 boots = 2000){
-
-
+	# some input checking
+	if(ncol(wc) != 4 || sum(c("sWeek", "stockGroup", "numReascend", "totalPass") %in%
+												  colnames(full_reascend)) != 4) stop("full_reascend must have 4 columns named: sWeek, stockGroup, numReascend, totalPass")
+	if(ncol(stratAssign_night) != 2 || sum(c("sWeek", "stratum") %in%
+														colnames(stratAssign_night)) != 2) stop("stratAssign_night must have 2 columns named: sWeek, stratum")
+	if(ncol(stratAssign_comp) != 2 || sum(c("sWeek", "stratum") %in%
+														colnames(stratAssign_comp)) != 2) stop("stratAssign_comp must have 2 columns named: sWeek, stratum")
 	# first, expand each sWeek for wc_prop and nighttime passage
 
 	# similar setup for window count

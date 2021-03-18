@@ -66,6 +66,7 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 	}
 
 	# matching up strata
+	checkStrata(stratAssign_comp = stratAssign_comp, stratAssign_fallback = stratAssign_fallback)
 	strataMatchUp <- stratAssign_comp %>% full_join(stratAssign_fallback %>% rename(fallback = stratum), by = "sWeek") %>%
 		select(-sWeek) %>% distinct
 

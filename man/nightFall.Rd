@@ -5,7 +5,6 @@
 \title{estimate fallback, reascension, and nighttime passage}
 \usage{
 nightFall(
-  wc,
   full_reascend,
   full_night,
   stratAssign_fallback,
@@ -15,6 +14,13 @@ nightFall(
 )
 }
 \arguments{
+\item{full_reascend}{tibble with sWeek, stockGroup, numReascend, totalPass. sWeek is statistical week
+stockGroup is the stockGroup (fallback/reascension rates different between stock groups), numReascend is either the
+number of PITs ascending that were reascensions in that sWeek or the number of PITs ascending that later
+reascended (if using spillway data it MUST be the second)}
+
+\item{full_night}{tibble with sWeek, nightPass, totalPass}
+
 \item{stratAssign_fallback}{tibble with sWeek, stockGroup, stratum showing what stratum each sWeek
 corresponds to for each stockGroup}
 
