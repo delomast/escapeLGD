@@ -123,7 +123,7 @@ expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_c
 											 boots = 2000){
 	# some input checking
 	if(ncol(wc) != 2 || sum(c("sWeek", "wc") %in%
-												  colnames(wc)) != 4) stop("wc must have 2 columns named: sWeek, wc")
+												  colnames(wc)) != 2) stop("wc must have 2 columns named: sWeek, wc")
 	if(ncol(stratAssign_night) != 2 || sum(c("sWeek", "stratum") %in%
 														colnames(stratAssign_night)) != 2) stop("stratAssign_night must have 2 columns named: sWeek, stratum")
 	if(ncol(stratAssign_comp) != 2 || sum(c("sWeek", "stratum") %in%
