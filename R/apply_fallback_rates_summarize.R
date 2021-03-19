@@ -66,7 +66,7 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 	}
 
 	# matching up strata
-	checkStrata(stratAssign_comp = stratAssign_comp, stratAssign_fallback = stratAssign_fallback)
+	checkStrata(stratAssign_comp = stratAssign_comp, stratAssign_fallback = stratAssign_fallback, quiet = TRUE)
 	strataMatchUp <- stratAssign_comp %>% full_join(stratAssign_fallback %>% rename(fallback = stratum), by = "sWeek") %>%
 		select(-sWeek) %>% distinct
 
@@ -176,7 +176,7 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 		summarise(lci = quantile(total, alpha_ci/2), uci = quantile(total, 1 - (alpha_ci/2)))
 	# calculate point estimates for the run and add CIs
 	output <- bind_rows(full_breakdown_H, full_breakdown_HNC, full_breakdown_W) %>% group_by(rear, var1, var2) %>%
-		summarise(pointEst = sum(total)) %>% full_join(cis, by = c("rear", "var1", "var2"))
+		summarise(pointEst = sum(total)) %>% full_join(cis, by = c("rear", "var1", "var2")) %>% ungroup()
 
 	if(output_type == "summary") return(output = output)
 	# mainly for troubleshooting or extending method
@@ -191,7 +191,7 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 	W_boot <- bind_rows(boot_breakdown_H, boot_breakdown_HNC, boot_breakdown_W) %>% filter(rear == "W")
 	# if var1 only estimates are included, prevent doubling the estimates
 	if(any(is.na(W_boot$var2))) W_boot <- W_boot %>% filter(is.na(var2))
-	W_boot <- W_boot %>% group_by(stratum, boot) %>% summarise(total = sum(total)) %>% spread(stratum, total)
+	W_boot <- W_boot %>% group_by(stratum, boot) %>% summarise(total = sum(total), .groups = "drop") %>% spread(stratum, total)
 
 	return(list(output = output, W_boot = W_boot))
 

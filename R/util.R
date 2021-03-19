@@ -5,8 +5,9 @@
 #'
 #' @param stratAssign_comp the strata assignment tibble for composition estimates
 #' @param stratAssign_fallback the strata assignment tibble for fallback/reascension estimates
+#' @param quiet when FALSE, it prints a message confirming that strata are compatible
 #' @export
-checkStrata <- function(stratAssign_comp, stratAssign_fallback){
+checkStrata <- function(stratAssign_comp, stratAssign_fallback, quiet = FALSE){
 	eval <- stratAssign_comp %>% rename(comp = stratum) %>%
 		full_join(stratAssign_fallback %>% rename(fall = stratum), by = "sWeek") %>%
 		select(stockGroup, sWeek, comp, fall) %>% arrange(stockGroup, comp, fall)
@@ -19,5 +20,5 @@ checkStrata <- function(stratAssign_comp, stratAssign_fallback){
 			}
 		}
 	}
-	message("Strata are compatible")
+	if(!quiet) message("Strata are compatible")
 }
