@@ -288,8 +288,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 				#  can cause "NULL" to be returned during estimates for var2. So manaully settign any group
 				#  not present in the untagged - unassigned fish to 0
 				left_join(tibble(var1 = colnames(v1Data), numTrap = v1Data["Unassigned",]), by = "var1") %>%
-				mutate(prop = if_else(numTrap == 0, 0, prop), prop = prop / sum(prop)) %>%
-				select(var1, prop)
+				filter(numTrap > 0) %>% mutate(prop = prop / sum(prop)) %>% select(var1, prop)
 		}
 
 		estim <- tempEstim %>% mutate(total = prop * wc_expanded * (1 - pClip) * (1 - pPhys) * (1 - pPBTonly)) %>%
@@ -300,7 +299,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 		# var2
 		if(!is.null(v2)){
 			###
-			# this is the tricky one. have to fix group porportions and var1 propotions
+			# this is the tricky one. have to fix group proportions and var1 proportions
 			# then infer proportions of var2 within var1
 			# going to assume var1 and var2 are independent in HNC? Yes b/c var1 should be genetic stock
 			###
