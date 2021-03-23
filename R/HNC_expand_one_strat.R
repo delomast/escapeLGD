@@ -74,7 +74,6 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 				return(NULL)
 			}
 
-
 			if(v1 == pbt_var){
 				if(!"Unassigned" %in% v2Data$var1 || !any(v2Data$var1 != "Unassigned")){
 					#### handle when all fish assigned
@@ -284,7 +283,13 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 			# now run MLE routine with known piGroup
 			varProbs <- PBT_var2_calc_MLE(v2Data = v1Data, piGroup = piGroup, tagRates = tempTagRates)
 			tempEstim <- tibble(var1 = colnames(varProbs),
-									  prop = varProbs["Unassigned",])
+									  prop = varProbs["Unassigned",]) %>%
+				# MLE can't push parameters all the way to zero, and non-zero estimates for unsampled groups
+				#  can cause "NULL" to be returned during estimates for var2. So manaully settign any group
+				#  not present in the untagged - unassigned fish to 0
+				left_join(tibble(var1 = colnames(v1Data), numTrap = v1Data["Unassigned",]), by = "var1") %>%
+				mutate(prop = if_else(numTrap == 0, 0, prop), prop = prop / sum(prop)) %>%
+				select(var1, prop)
 		}
 
 		estim <- tempEstim %>% mutate(total = prop * wc_expanded * (1 - pClip) * (1 - pPhys) * (1 - pPBTonly)) %>%
