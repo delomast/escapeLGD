@@ -87,12 +87,8 @@ HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 	for(b in 1:boots){
 		for(s in unique(stratAssign_comp$stratum)){
 			while(TRUE){
-				# resample genotyped and not genotyped separately b/c genotyping is only done on a specified subsample
-				bootData <- bind_rows(trap %>% filter(stratum == s, is.na(pbtAssign)) %>%
-											 	sample_n(nrow(.), replace = TRUE),
-											 trap %>% filter(stratum == s, !is.na(pbtAssign)) %>%
+				bootData <- trap %>% filter(stratum == s) %>%
 											 	sample_n(nrow(.), replace = TRUE)
-				)
 				if(method == "Account"){
 					bootRes <- HNC_expand_one_strat(trap = bootData, H_vars = H_vars,
 															  HNC_vars = HNC_vars,
@@ -240,12 +236,8 @@ HNC_expand_unkGSI <- function(trap, stratAssign_comp, boots = 2000,
 	for(b in 1:boots){
 		for(s in unique(stratAssign_comp$stratum)){
 			while(TRUE){
-				# resample genotyped and not genotyped separately b/c genotyping is only done on a specified subsample
-				bootData <- bind_rows(trap %>% filter(stratum == s, is.na(pbtAssign)) %>%
-											 	sample_n(nrow(.), replace = TRUE),
-											 trap %>% filter(stratum == s, !is.na(pbtAssign)) %>%
+				bootData <- trap %>% filter(stratum == s) %>%
 											 	sample_n(nrow(.), replace = TRUE)
-				)
 				# update GSI assignments
 				ind_matches <- match(bootData$Ind, GSI_draws[[1]])
 				bootData[[GSI_var]] <- GSI_draws[[b+1]][ind_matches] # first column is ind names

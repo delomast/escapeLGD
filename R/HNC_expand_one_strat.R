@@ -372,6 +372,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 
 			estimates <- estimates %>% bind_rows(
 				estim2 %>% left_join(estim %>% select(var1, total), by = "var1") %>%
+					filter(!is.na(total)) %>% # some groups have composition estimated (stays at initial values) when present in HNC but not in W, need to remove b/c total is 0
 					mutate(total = prop * total, # multiply proportion by total number of fish
 							 rear = "W") %>% select(rear, var1, var2, total)
 			)
