@@ -172,13 +172,53 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 
 	# now calculate CIs for the run
 	cis <- bind_rows(boot_breakdown_H, boot_breakdown_HNC, boot_breakdown_W) %>% group_by(rear, var1, var2, boot) %>%
-		summarise(total = sum(total)) %>% ungroup %>% group_by(rear, var1, var2) %>%
-		summarise(lci = quantile(total, alpha_ci/2), uci = quantile(total, 1 - (alpha_ci/2)))
+		summarise(total = sum(total), .groups = "drop") %>% group_by(rear, var1, var2) %>%
+		summarise(lci = quantile(total, alpha_ci/2), uci = quantile(total, 1 - (alpha_ci/2)), .groups = "drop")
 	# calculate point estimates for the run and add CIs
 	output <- bind_rows(full_breakdown_H, full_breakdown_HNC, full_breakdown_W) %>% group_by(rear, var1, var2) %>%
-		summarise(pointEst = sum(total)) %>% full_join(cis, by = c("rear", "var1", "var2")) %>% ungroup()
+		summarise(pointEst = sum(total), .groups = "drop") %>% full_join(cis, by = c("rear", "var1", "var2"))
 
-	if(output_type == "summary") return(output = output)
+	# point estimates and CIs for rear type
+	rearCIs <- bind_rows(boot_breakdown_H, boot_breakdown_HNC, boot_breakdown_W) %>% group_by(rear, var1, var2, boot) %>%
+		summarise(total = sum(total), .groups = "drop") %>% group_by(rear, var1, var2) %>%
+		summarise(lci = quantile(total, alpha_ci/2), uci = quantile(total, 1 - (alpha_ci/2)), .groups = "drop")
+	rearCIs <- bind_rows(boot_breakdown_H, boot_breakdown_HNC, boot_breakdown_W)
+	# avoid doubling estimates
+	rearCIs <- tibble()
+	rearPoint <- tibble()
+	if(any(is.na(boot_breakdown_H$var2))) {
+		rearCIs <- rearCIs %>% bind_rows(boot_breakdown_H %>% filter(is.na(var2)))
+		rearPoint <- rearPoint %>% bind_rows(full_breakdown_H %>% filter(is.na(var2)))
+	} else {
+		rearCIs <- rearCIs %>% bind_rows(boot_breakdown_H)
+		rearPoint <- rearPoint %>% bind_rows(full_breakdown_H)
+	}
+	if(any(is.na(boot_breakdown_HNC$var2))) {
+		rearCIs <- rearCIs %>% bind_rows(boot_breakdown_HNC %>% filter(is.na(var2)))
+		rearPoint <- rearPoint %>% bind_rows(full_breakdown_HNC %>% filter(is.na(var2)))
+
+	} else {
+		rearCIs <- rearCIs %>% bind_rows(boot_breakdown_HNC)
+		rearPoint <- rearPoint %>% bind_rows(full_breakdown_HNC)
+
+	}
+	if(any(is.na(boot_breakdown_W$var2))) {
+		rearCIs <- rearCIs %>% bind_rows(boot_breakdown_W %>% filter(is.na(var2)))
+		rearPoint <- rearPoint %>% bind_rows(full_breakdown_W %>% filter(is.na(var2)))
+
+	} else {
+		rearCIs <- rearCIs %>% bind_rows(boot_breakdown_W)
+		rearPoint <- rearPoint %>% bind_rows(full_breakdown_W)
+	}
+	rearCIs <- rearCIs  %>% group_by(rear, boot) %>%
+		summarise(total = sum(total), .groups = "drop") %>% group_by(rear) %>%
+		summarise(lci = quantile(total, alpha_ci/2), uci = quantile(total, 1 - (alpha_ci/2)), .groups = "drop")
+	rear <- rearPoint %>% group_by(rear) %>% summarise(pointEst = sum(total), .groups = "drop") %>%
+		full_join(rearCIs, by = "rear") %>% ungroup()
+
+	if(output_type == "summary") return(list(output = output, rearType = rear))
+
+
 	# mainly for troubleshooting or extending method
 	if(output_type == "full") return(list(output = output, full_breakdown_H = full_breakdown_H,
 													  full_breakdown_HNC = full_breakdown_HNC,
