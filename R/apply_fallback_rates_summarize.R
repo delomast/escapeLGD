@@ -210,11 +210,15 @@ apply_fallback_rates <- function(breakdown, fallback_rates,
 		rearCIs <- rearCIs %>% bind_rows(boot_breakdown_W)
 		rearPoint <- rearPoint %>% bind_rows(full_breakdown_W)
 	}
-	rearCIs <- rearCIs  %>% group_by(rear, boot) %>%
+	totalCIs <- rearCIs %>% group_by(boot) %>% summarise(total = sum(total), .groups = "drop") %>%
+		pull(total) %>% quantile(c(alpha_ci/2, 1 - (alpha_ci/2)))
+	rearCIs <- rearCIs %>% group_by(rear, boot) %>%
 		summarise(total = sum(total), .groups = "drop") %>% group_by(rear) %>%
 		summarise(lci = quantile(total, alpha_ci/2), uci = quantile(total, 1 - (alpha_ci/2)), .groups = "drop")
 	rear <- rearPoint %>% group_by(rear) %>% summarise(pointEst = sum(total), .groups = "drop") %>%
-		full_join(rearCIs, by = "rear") %>% ungroup()
+		full_join(rearCIs, by = "rear") %>% ungroup() %>%
+		bind_rows(tibble(rear = "All", pointEst = sum(rearPoint$total),
+							  lci = totalCIs[1], uci = totalCIs[2]))
 
 	if(output_type == "summary") return(list(output = output, rearType = rear))
 
