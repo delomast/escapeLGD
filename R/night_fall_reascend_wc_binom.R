@@ -120,7 +120,7 @@ nightFall <- function(full_reascend, full_night, stratAssign_fallback, stratAssi
 #'   for composition estimation using the trap data
 #' @export
 expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_comp, stratAssign_night,
-											 boots = 2000){
+											 boots = 2000, alpha_ci = .1){
 	# some input checking
 	if(ncol(wc) != 2 || sum(c("sWeek", "wc") %in%
 												  colnames(wc)) != 2) stop("wc must have 2 columns named: sWeek, wc")
@@ -129,7 +129,8 @@ expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_c
 	if(ncol(stratAssign_comp) != 2 || sum(c("sWeek", "stratum") %in%
 														colnames(stratAssign_comp)) != 2) stop("stratAssign_comp must have 2 columns named: sWeek, stratum")
 	# first, expand each sWeek for wc_prop and nighttime passage
-
+	pointNight <- 0
+	nightPass <- rep(0, boots)
 	# similar setup for window count
 	wc_binom <- list(wc %>% mutate(wc = round(wc / wc_prop))) # expanding for wc_prop
 	wc_binom[[2]] <- matrix(nrow = boots, ncol = nrow(wc_binom[[1]]))
@@ -140,10 +141,18 @@ expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_c
 		temp_nightStrata <- which(nightPassage_rates[[1]]$stratum == temp_nightStrata) # change into row/column number
 		temp_nightRate <- nightPassage_rates[[1]]$p_night[temp_nightStrata]
 		# expanding point estimate
-		wc_binom[[1]]$wc[i] <-  wc_binom[[1]]$wc[i] / (1 - temp_nightRate)
+		temp <- wc_binom[[1]]$wc[i] / (1 - temp_nightRate)
+		pointNight <- pointNight + temp - wc_binom[[1]]$wc[i]
+		wc_binom[[1]]$wc[i] <- temp
+		rm(temp)
 		# expanding bootstrap
-		wc_binom[[2]][,i] <- wc_binom[[2]][,i] / (1 - nightPassage_rates[[2]][,temp_nightStrata])
+		temp <- wc_binom[[2]][,i] / (1 - nightPassage_rates[[2]][,temp_nightStrata])
+		nightPass <- nightPass + temp - wc_binom[[2]][,i]
+		wc_binom[[2]][,i] <- temp
+		rm(temp)
 	}
+	pointNight <- pointNight / sum(wc_binom[[1]]$wc)
+	nightPass <- nightPass / rowSums(wc_binom[[2]])
 
 	# then sum together according to strata
 	wc_binom[[1]] <- wc_binom[[1]] %>% left_join(stratAssign_comp, by = "sWeek")
@@ -161,11 +170,10 @@ expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_c
 	wc_binom[[1]] <- wc_binom[[1]] %>% group_by(stratum) %>% summarise(wc = sum(wc))
 	wc_binom[[2]] <- temp_bootstrapMatrix
 
+	# add point estimate and CI for overall nighttime passage rate
+	wc_binom[[3]] <- tibble(overallNightPass = pointNight,
+									lci = quantile(nightPass, alpha_ci / 2),
+									uci = quantile(nightPass, 1 - (alpha_ci / 2)))
+
 	return(wc_binom)
 }
-
-
-
-
-# modular
-# steps are: nighttime passage, fallback/reascension, composition of ascensions, multiply everything together
