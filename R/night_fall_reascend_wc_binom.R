@@ -173,7 +173,7 @@ expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_c
 	# add point estimate and CI for overall nighttime passage rate
 	wc_binom[[3]] <- tibble(overallNightPass = pointNight,
 									lci = quantile(nightPass, alpha_ci / 2),
-									uci = quantile(nightPass, 1 - (alpha_ci / 2)))
+									lci = quantile(nightPass, 1 - (alpha_ci / 2)))
 
 	return(wc_binom)
 }
