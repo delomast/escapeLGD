@@ -28,14 +28,14 @@ checkStrata <- function(stratAssign_comp, stratAssign_fallback, quiet = FALSE){
 #' that are split between groups released below and above LGD.
 #' @param est_comp The output of either \code{ascension_composition} or
 #'   \code{HNC_expand} where PBT release group was estimated as var1 for H and HNC.
-#' @param PITdetectionSummary A tibble with columns releaseGroupPBT, stockGroup,
+#' @param splitByPITinput A tibble with columns releaseGroupPBT, stockGroup,
 #'   releaseGroupPIT (optional), detectPIT, and tagRatePIT. Each line defines a
 #'   PIT tag release group. releaseGroupPBT is the var1 (within H and HNC) that the PIT
 #'   release group belongs to. stockGroup defines the stockGroup it belongs to (typically "upper" or "lower")
 #'   detectPIT is the number of PIT tags detected from this group (actual number NOT expanded number)
 #'   and tagRatePIT is the PIT tagging rate for this group.
 #' @export
-splitByPIT <- function(est_comp, PITdetectionSummary){
+splitByPIT <- function(est_comp, splitByPITinput){
 	uComb <- est_comp[[1]] %>% filter(rear %in% c("H", "HNC")) %>% select(var1) %>% distinct
 	nBoot <- est_comp[[2]] %>% pull(boot) %>% n_distinct()
 	for(g in uComb$var1[uComb$var1 %in% splitByPITinput$releaseGroupPBT]){

@@ -6,13 +6,13 @@
 according to PIT tag detections. Used for WA "release groups"
 that are split between groups released below and above LGD.}
 \usage{
-splitByPIT(est_comp, PITdetectionSummary)
+splitByPIT(est_comp, splitByPITinput)
 }
 \arguments{
 \item{est_comp}{The output of either \code{ascension_composition} or
 \code{HNC_expand} where PBT release group was estimated as var1 for H and HNC.}
 
-\item{PITdetectionSummary}{A tibble with columns releaseGroupPBT, stockGroup,
+\item{splitByPITinput}{A tibble with columns releaseGroupPBT, stockGroup,
 releaseGroupPIT (optional), detectPIT, and tagRatePIT. Each line defines a
 PIT tag release group. releaseGroupPBT is the var1 (within H and HNC) that the PIT
 release group belongs to. stockGroup defines the stockGroup it belongs to (typically "upper" or "lower")
