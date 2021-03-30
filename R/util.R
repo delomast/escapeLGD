@@ -61,4 +61,6 @@ splitByPIT <- function(est_comp, PITdetectionSummary){
 			mutate(var1 = paste0(var1, "_", stockGroup), total = total * r) %>% select(boot, stratum, rear, var1, var2, total)
 		est_comp[[2]] <- bind_rows(est_comp[[2]] %>% filter(!(rear %in% c("H", "HNC") & var1 == g)), toBind)
 	}
+
+	return(est_comp)
 }
