@@ -10,7 +10,8 @@ expand_wc_binom_night(
   wc_prop,
   stratAssign_comp,
   stratAssign_night,
-  boots = 2000
+  boots = 2000,
+  alpha_ci = 0.1
 )
 }
 \arguments{

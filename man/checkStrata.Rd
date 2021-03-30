@@ -5,12 +5,14 @@
 \title{A function to check if the composition and fallback strata are
 compatible. Each composition stratum must have one and only one fallback stratum}
 \usage{
-checkStrata(stratAssign_comp, stratAssign_fallback)
+checkStrata(stratAssign_comp, stratAssign_fallback, quiet = FALSE)
 }
 \arguments{
 \item{stratAssign_comp}{the strata assignment tibble for composition estimates}
 
 \item{stratAssign_fallback}{the strata assignment tibble for fallback/reascension estimates}
+
+\item{quiet}{when FALSE, it prints a message confirming that strata are compatible}
 }
 \description{
 A function to check if the composition and fallback strata are
