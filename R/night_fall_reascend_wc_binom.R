@@ -135,7 +135,12 @@ expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_c
 	wc_binom <- list(wc %>% mutate(wc = round(wc / wc_prop))) # expanding for wc_prop
 	wc_binom[[2]] <- matrix(nrow = boots, ncol = nrow(wc_binom[[1]]))
 	for(i in 1:nrow(wc_binom[[1]])){
-		wc_binom[[2]][,i] <- rbinom(boots, wc_binom[[1]]$wc[i], wc_prop) / wc_prop
+		# handle negative window counts
+		if(wc_binom[[1]]$wc[i] < 0){
+			wc_binom[[2]][,i] <- -rbinom(boots, -wc_binom[[1]]$wc[i], wc_prop) / wc_prop
+		} else {
+			wc_binom[[2]][,i] <- rbinom(boots, wc_binom[[1]]$wc[i], wc_prop) / wc_prop
+		}
 		# nighttime passage
 		temp_nightStrata <- stratAssign_night$stratum[stratAssign_night$sWeek == wc$sWeek[i]]
 		temp_nightStrata <- which(nightPassage_rates[[1]]$stratum == temp_nightStrata) # change into row/column number
