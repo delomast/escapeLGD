@@ -5,6 +5,7 @@
 #' @import tibble
 #' @import readr
 #' @import tidyr
+#' @importFrom stats dbinom dmultinom optim quantile rbinom rmultinom
 #' @export
 HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 							  pbt_var, timestep_var, physTag_var,
