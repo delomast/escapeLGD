@@ -1,3 +1,25 @@
+#' applies the estimated fallback rates to the estiamted ascension composition
+#' to yield estimated escapement
+#'
+#' @param breakdown The output of either \code{HNC_expand_unkGSI}, \code{HNC_expand}, or
+#'   \code{ascension_composition}
+#' @param fallback_rates The fallback rates portion of the output of \code{nightFall}
+#' @param split_H_fallback one of "var1", "var2", or "both" indicating which variable(s)
+#'   should be used to link estimates of composition with fallback rates for "H" fish
+#' @param split_HNC_fallbackone of "var1", "var2", or "both" indicating which variable(s)
+#'   should be used to link estimates of composition with fallback rates for "HNC" fish
+#' @param split_W_fallbackone of "var1", "var2", or "both" indicating which variable(s)
+#'   should be used to link estimates of composition with fallback rates for "W" fish
+#' @param H_groups \code{NULL} to get templates returned, or a tibble linking categories to stockGroups
+#' @param HNC_groups \code{NULL} to get templates returned, or a tibble linking categories to stockGroups
+#' @param W_groups \code{NULL} to get templates returned, or a tibble linking categories to stockGroups
+#' @param stratAssign_fallback tibble with sWeek, stockGroup, stratum showing what stratum each sWeek
+#'   corresponds to for each stockGroup
+#' @param stratAssign_comp tibble with sWeek, stratum showing what stratum each sWeek corresponds to
+#'   for composition estimation using the trap data
+#' @param alpha_ci the alpha value for CI calculation
+#' @param output_type one of "summary", "W_boot", or "full" dependign on the output type you want
+#'
 #' @export
 apply_fallback_rates <- function(breakdown, fallback_rates,
 											split_H_fallback = c("var1", "var2", "both"),
