@@ -493,7 +493,7 @@ PBT_breakdown <- function(values, tagRates, boots){
 #'   estimates and bootstrap estimates
 #' @keywords internal
 #' @noRd
-subGroup_breakdown <- function(trapStratumData, vars, pbt_var, tagRates, boots = boots){
+subGroup_breakdown <- function(trapStratumData, vars, pbt_var, tagRates, boots){
 	list_break <- list()
 	v1 <- vars[1]
 	v2 <- if(length(vars) == 2) vars[2] else NULL
@@ -512,6 +512,13 @@ subGroup_breakdown <- function(trapStratumData, vars, pbt_var, tagRates, boots =
 		for(j in 1:nrow(list_break[[1]][[1]])){ # run breakdown for all categories
 			v1Cat <- list_break[[1]][[1]]$group[j] # current value of v1
 			tempData <- trapStratumData[[v2]][trapStratumData[[v1]] == v1Cat]
+			if(list_break[[1]][[1]]$prop[j] == 0 && length(tempData) == 0){
+				# makign one entry for when there are no Unassigned fish
+				list_break[[2]][[j]] <- list(tibble(group = sort(trapStratumData[[v2]])[1], prop = 0),
+													  matrix(0, nrow = boots, ncol = 1))
+				colnames(list_break[[2]][[j]][[2]]) <- list_break[[2]][[j]][[1]]$group[1]
+				next
+			}
 			if(v2 == pbt_var){
 				list_break[[2]][[j]] <- PBT_breakdown(values = tempData, tagRates = tagRates, boots = boots)
 			} else {

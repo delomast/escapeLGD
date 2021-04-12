@@ -1,0 +1,574 @@
+---
+title: "Estimate_escapement"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Estimate_escapement}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(escapeLGD)
+```
+
+This vignette will show you how to estimate escapement at Lower Granite Dam.
+We will be using steelhead data as an example. Note that all data objects in this vignette
+are included in the package, so you can follow along and explore the data objects in more
+detail.
+
+Uncertainty is quantified by bootstrapping. The same number of bootstraps must be run for all steps.
+To make this easy, we are going to define a variable with the number of bootstraps. To make this vignette
+run quickly, we are going to use a value of 10. In actuality, you should run many more. We also set the seed
+for the random number generator to make the bootstrapping exactly reproducible.
+
+```{r}
+numBoots <- 10
+set.seed(7)
+```
+
+
+
+# Nighttime passage and fallback rate
+
+Here we are estiamting nighttime passage rates and fallback rates. We are assuming
+that the rate of fallback _withOUT_ reascension is 0. 
+
+## Inputs
+
+The first dataset we need 
+is counts of the number of PIT tags ascending in each week and counts of how many of
+those PIT tags later fell back - as determined by detection in the ladder during 
+another ascension (regardless of what week it was). 
+
+```{r}
+fullReComplete
+```
+
+So you can see this is a tibble with four columns:
+
+* sWeek: the statistical week
+* stockGroup: the name of the group to which this row of data corresponds to and for which fallback and reascension is being estimated
+* numReascend: the number of PIT ascensions that _later_ reascended ($d_f$)
+* totalPass: the total number of PIT ascensions ($d_{as}$)
+
+Some important clarifying points:
+
+* totalPass is the total number of PIT ascensions, NOT the total number of unique fish ascending. 
+So if 5 fish were detected ascending once this week and one fish was detected ascending 3 times this week, then totalPass would be 8
+* numReascend is the number of the ascensions in totalPass that later reascended, regardless of when they reascended. So, continuing 
+the example from above, if the 6 fish were never detected again, then numReascend would be 2. If one of the fish was detected ascending again 6 weeks later, numReascend would be 3
+
+
+The next dataset is counts of PIT tags ascending in each week and counts of how many were at night.
+
+
+```{r}
+fullNi
+```
+
+This is a tibble with three columns:
+
+* sWeek: the statistical week
+* nightPass: the number of PIT ascensions that were at night ($d_n$)
+* totalPass: the total number of PIT ascensions ($d_a$)
+
+Note that the sum of `totalPass` in `fullNi` should be the sum of `totalPass` in 
+`fullReComplete` unless there are PIT tags ascending with ambiguous stockGroup.
+
+We need the stratification for fallback:
+
+```{r}
+stratFallback
+```
+
+This is a tibble with three columns:
+
+* stockGroup: the name of the group to which this row of data corresponds to and for which fallback and reascension is being estimated
+* sWeek: the statistical week
+* stratum: the stratum that this week belongs to for the given stockGroup
+
+All weeks should have a stratum defined for all stockGroups. The stratum for a particular week can (and likely should) be
+different for different stockGroups.
+
+
+We also need the stratification for nighttime passage:
+
+```{r}
+stratNight
+```
+
+This is a tibble with two columns:
+
+* sWeek: the statistical week
+* stratum: the stratum that this week belongs to
+
+## Estimates
+
+Now we run part of the model to estimate fallback rates and nighttime passage rates.
+
+```{r}
+nf <- nightFall(full_reascend = fullReComplete, full_night = fullNi,
+					 stratAssign_fallback = stratFallback, stratAssign_night = stratNight,
+					 full_spillway = NULL, boots = numBoots)
+```
+
+Because we didn't include spillway data, it is telling us that it is assuming no fallback without reascension. 
+This may not be true if you included detected fallbacks using detectors other than the ladder 
+in `fullReComplete$numReascend`, but the program can't tell so it issues the message.
+
+The estimates are now saved to `nf` and we will use this object as an input to future functions.
+Let's look through `nf` so you can understand what is in it in case you need nay of the specific information 
+or want to do something fancy.
+
+```{r}
+nf$fallback_rates[[1]]
+head(nf$fallback_rates[[2]])
+```
+
+`nf$fallback_rates[[1]]` is a tibble containing point estimates(column `p_fa`) fo the fallback rate for each stockGroup x stratum combination.
+`nf$fallback_rates[[2]]` is a matrix containing bootstrap estimates. The columns correspond to the rows of `nf$fallback_rates[[1]]`.
+
+
+```{r}
+nf$nightPassage_rates[[1]]
+head(nf$nightPassage_rates[[2]])
+```
+
+`nf$nightPassage_rates[[1]]` is a tibble containing point estimates(column `p_night`) fo the nighttime passage
+rate for each stratum.
+`nf$nightPassage_rates[[2]]` is a matrix containing bootstrap estimates. The columns correspond to the rows of `nf$nightPassage_rates[[1]]`.
+
+# Total number of ascensions
+
+We need to do two things to estimate the total number of ascensions:
+
+1. Adjust for the proportion of time counting is performed during the day
+1. Add in nighttime passage using the rates estimated in the last step
+
+## Inputs
+
+We need the _raw_ window count estimates by week. These should _NOT_ be expanded for the counting time. 
+There should be a value for every statistical week, even if it is 0.
+
+```{r}
+wc
+```
+
+This is a tibble with two columns:
+
+* sWeek: the statistical week
+* wc: the number of fish counted that week ($w$)
+
+We also need to know the proportion of time that counting was performed during the day ($r$). Historically, 
+this has been $\frac{5}{6}$.
+
+And we need the stratification for the composition estimates
+
+```{r}
+stratComp
+```
+
+This is a tibble with two columns:
+
+* sWeek: the statistical week
+* stratum: the stratum that this week belongs to
+
+
+There is a built in function to check that our composition strata are compatible
+with our fallback strata. Let's make sure before we move on.
+
+```{r}
+checkStrata(stratAssign_comp = stratComp, stratAssign_fallback = stratFallback)
+```
+
+
+## Estimates
+
+Now we run the part of the model that estimates the total number of ascensions. This 
+involves expanding the window count for the proportion of time sampling and applying 
+the ngihttime passage rates previously estimated.
+
+```{r}
+exp_wc <- expand_wc_binom_night(nightPassage_rates = nf$nightPassage_rates, wc = wc,
+										  wc_prop = 5/6, stratAssign_comp = stratComp,
+										  stratAssign_night = stratNight, boots = numBoots)
+```
+
+The estimates are now saved to `exp_wc` and we will use this object as an input to future functions.
+Let's look through `exp_wc` so you can understand what is in it in case you need nay of the specific information 
+or want to do something fancy.
+
+
+```{r}
+exp_wc[[1]]
+```
+
+The first item is a tibble containing the point estimates for the total numer of ascensions in each composition stratum.
+
+```{r}
+head(exp_wc[[2]])
+```
+
+The second item is a matrix with bootstrap estimates. The columns of this matrix correspond to the rows of `exp_wc[[1]]`.
+
+```{r}
+exp_wc[[3]]
+```
+
+The third item is a tibble with the overall point estimate of nighttime passage (for the entire run) and the CI. The default $\alpha$ for the CI is 0.1, but this can be changed by passing the argument `alpha_ci` to the function `expand_wc_binom_night`.
+
+
+# Composition of ascensions
+
+## Inputs
+To estimate the composition of ascensions, we need to select the variables we want
+to estimate composition for in H, HNC, and W.
+```{r}
+#creating a categorical length variable
+trap$lenCat <- ifelse(trap$LGDFLmm >= 780, "Lg", "Sm")
+w <- c("GenStock", "lenCat")
+h <- c("releaseGroup")
+hnc <- c("releaseGroup")
+```
+
+If we want to incorporate GSI uncertainty, we need a dataset with draws from the posterior for all samples
+
+```{r}
+gsiDraws
+```
+
+The first column must be a sample identifier, and all other columns have GSI assignments. 
+Each column represents one draw from the posterior. Fish that were not assessed for GSI are given values of "NA".
+
+
+We also need the trap data
+```{r}
+trap
+```
+
+There's a lot here because this was pulled from the Granite database. Here are the only columns we need for the analysis
+
+```{r}
+trap[,c("MasterID", "releaseGroup", "sWeek", "physTag", "LGDMarkAD", "GenStock", "lenCat")]
+```
+
+We need
+
+* A variable with sample IDs that correspond to the sample IDs in `gsiDraws`
+* A variable giving PBT assignments ("Unassigned" for fish that were 
+  attempted to be assigned but did not and "NA" for fish that were not genotyped)
+* A variable giving the statistical week
+* A variable denoting if a sample was recorded as having a physical tag denoting it of hatchery 
+  origin ("TRUE") or not ("FALSE"). If samples were not assessed for physical tags, they should
+  be given a value of "FALSE".
+* A variable denoting if a sample for ad-clipped ("AD") or ad-intact ("AI"). No other values
+  (including "NA") are allowed.
+* Any other variables that you are estimating composition for
+
+We need PBT tag rates
+
+```{r}
+# filtering out any erroneous tag rates
+tagRates <- tagRates[!is.na(tagRates$tagRate) & tagRates$tagRate > 0,]
+tagRates
+```
+
+This is a tibble with two columns. The first gives in names of the PBT groups matching the 
+names in the "releaseGroup" column of the trap data. The second gives the tag rates. These should
+be > 0 and <= 1.
+
+
+## Estimates
+
+There are several ways to estimate composition. This first example shows how to use the MLE method
+and incorporate uncertainty in the GSI assignments.
+
+
+```{r}
+# lets randomize the order of the GSI draws - this may have 
+#  already been done, but doing it again won't hurt
+gsiDraws <- gsiDraws[,c(1, sample(2:ncol(gsiDraws), size = ncol(gsiDraws) - 1, replace = FALSE))]
+# now run the estimating function - this will take a while
+# with large numbers of bootstraps
+est_comp <- HNC_expand_unkGSI(trap = trap, stratAssign_comp = stratComp, 
+					boots = numBoots,
+					pbt_var = "releaseGroup", timestep_var = "sWeek", 
+					physTag_var = "physTag", adclip_var = "LGDMarkAD", 
+					sampID = "MasterID", tagRates = tagRates,
+					H_vars = h, HNC_vars = hnc, W_vars = w, 
+					wc_binom = exp_wc, GSI_draws = gsiDraws, 
+					n_point = ceiling(.1 * numBoots), GSI_var = "GenStock",
+					method = "MLE")
+```
+
+Note that the `n_point` argument gives the number of iterations (GSI draws) to use in calculating
+the point estimate. When actually applying this, I recommend about 100 iterations.
+
+There are other ways of estimating composition. To use the accounting method, change to
+`method = "Acc`. To treat GSI assignments as fixed, change the function to `HNC_expand` and
+you can pass either method (MLE or Acc) to that function as well. You also don't need to 
+specify `sampID, n_point, GSI_draws, GSI_var`. To use the reimplementaion of the old SCOBI
+method, use the function `ascension_composition`.
+
+You may get a few warnings about non-convergence of the MLE estimator. This typically happens during a few 
+of the bootstrap iterations and is likely caused by either computational contraints
+preventing parameters from being pushed all the way to 0 or the hierarchical, 
+stepwise structure of the estimation routine. This structure is important so that estimates of some variables
+don't change depending on the other variables being estimated. As long as the number of warnings is less than 
+about 1% of (the number of bootstrap iterations * the number of composition strata), I wouldn't worry about it.
+If there are a very large number of errors then I would first check the data inputs to make sure there aren't
+any mistakes. Then, you can run the accounting estimator and compare results between the accounting method and
+the MLE method.
+
+The estimates are now saved to `est_comp` and we will use this object as an input to future functions.
+Let's look through `est_comp` so you can understand what is in it in case you need nay of the specific information 
+or want to do something fancy.
+
+```{r}
+est_comp[[1]]
+```
+
+This has point estimates for the number of ascensions in each stratum and category (rear, var1, var2).
+The rows with "NA" for var2 represent the total estimated for the var1 category (encompassing all var2 values).
+
+```{r}
+est_comp[[2]]
+```
+
+This has bootstrap estimates for the number of ascensions in each bootstrap iteration, stratum 
+and category (rear, var1, var2).
+
+
+# Ambiguous PBT groups
+
+Some steelhead PBT groups released by OR and/or WA are ambiguous with respect to which
+fallback rate should be applied. We can use PIT tag data to split these. If this does not
+apply, you can skip this step.
+
+## Inputs
+
+```{r}
+sthd_splitPITdata
+```
+
+This is a tibble where each row represents a PIT tag release group (a group 
+of fish with one PIT tag rate) with five columns:
+
+* releaseGroupPBT: this is the name of the PBT group the fish belong to. This should match the name in `est_comp`.
+* stockGroup: the stock group that this PIT tag release group represents. This should match the name
+  in `nf[[1]]`.
+* releaseGroupPIT: this is for your use keeping track of the PIT tag release groups, it is ignored by the function.
+* detectPIT: this is the number of PIT tags detected at Lower Granite Dam for this group (e.g., $d_A$)
+* tagRatePIT: this is the tag rate of that PIT tag group (e.g., $t_A$)
+
+## Estimates
+
+Now we split the groups as necessary
+
+```{r}
+split_est_comp <- splitByPIT(est_comp, sthd_splitPITdata)
+```
+
+The output has the same structure as `est_comp`. Let's look specifically 
+at one of group that was split.
+
+The original
+
+```{r}
+est_comp[[1]][est_comp[[1]]$var1 == sthd_splitPITdata$releaseGroupPBT[1],]
+```
+
+And after splitting
+
+```{r}
+split_est_comp[[1]][grepl(sthd_splitPITdata$releaseGroupPBT[1], split_est_comp[[1]]$var1),]
+unique(split_est_comp[[1]][grepl(sthd_splitPITdata$releaseGroupPBT[1], split_est_comp[[1]]$var1),]$var1)
+```
+
+All the entries have now been split, and the new names are "old_name" + "_" + stockGroup. In this
+case, the stockGroups are "upper" and "lower". The bootstrap estimates have also been split.
+
+There's no reason to save the old `est_comp` unless you want to do something particular with it.
+Here we just saved it to allow us to examine the change. So to save memory, we will overwrite it.
+```{r}
+est_comp <- split_est_comp
+rm(split_est_comp)
+```
+
+
+
+# Applying fallback rates
+
+To estimate escapement, we need to apply the estimated fallback rates to the estimated 
+numbers of ascensions in each category.
+
+## Inputs
+
+We need to tell the function which categories that were estimated correspond to which 
+fallback rate. A convenient thing is to first get the function to tell you all the 
+categories it has. We do this by passing `NULL` to the `H_groups`, `HNC_groups`, and `W_groups`
+arguments. Note that the `split_*_fallback` arguments tell the function which variable should be
+used to assign fallback rates within each rear type.
+
+```{r}
+templates <- apply_fallback_rates(breakdown = est_comp, fallback_rates = nf$fallback_rates,
+					 split_H_fallback = "var1",
+					 split_HNC_fallback = "var1",
+					 split_W_fallback = "var1",
+					 H_groups = NULL, HNC_groups = NULL, W_groups = NULL,
+					 stratAssign_fallback = stratFallback, stratAssign_comp = stratComp, 
+					 alpha_ci = .1, output_type = "summary")
+templates
+```
+
+So `templates` now has three tibbles, one for each rear type, that give us the categories we
+need to assign to stock groups. You could save these to csv files and edit them manually, 
+or edit these all in R, but regardless, you should end up with all the values in the 
+"stockGroup" columns matching values in `nf[[1]][[1]]$stockGroup`.
+
+For this dataset, we have a tibble showing the correspondence of the PBT release groups that we will use
+
+```{r}
+sthd_stockGroup
+```
+
+So let's fill in the templates.
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse)) # these operations are WAY easier with the tidyverse
+# HNC
+templates$HNC <- templates$HNC %>% select(-stockGroup) %>% 
+	left_join(sthd_stockGroup, by = c("var1" = "releaseGroup"))
+# assigning the groups create by splitByPIT
+templates$HNC <- templates$HNC %>% 
+	mutate(stockGroup = ifelse(is.na(stockGroup) & grepl("_lower$", var1), "lower", 
+		ifelse(is.na(stockGroup) & grepl("_upper$", var1), "upper", stockGroup)))
+
+# H
+templates$H <- templates$H %>% select(-stockGroup) %>% 
+	left_join(sthd_stockGroup, by = c("var1" = "releaseGroup"))
+# assigning the groups create by splitByPIT
+templates$H <- templates$H %>% 
+	mutate(stockGroup = ifelse(is.na(stockGroup) & grepl("_lower$", var1), "lower", 
+		ifelse(is.na(stockGroup) & grepl("_upper$", var1), "upper", stockGroup)))
+```
+
+And for the W fish, only the "LSNAKE" stock is "lower".
+
+```{r}
+templates$W$stockGroup <- ifelse(templates$W$var1 == "LSNAKE", "lower", "upper")
+templates
+```
+
+And now the template has been filled in. We can make sure only valid values (and no NA) are
+present
+
+```{r}
+for(i in 1:3){
+	templates[[i]] %>% count(stockGroup) %>% print
+}
+```
+
+Now we apply the fallback rates and generate a summary output.
+
+
+```{r}
+est_escp <- apply_fallback_rates(breakdown = est_comp, fallback_rates = nf$fallback_rates,
+					 split_H_fallback = "var1",
+					 split_HNC_fallback = "var1",
+					 split_W_fallback = "var1",
+					 H_groups = templates$H, HNC_groups = templates$HNC, 
+					 W_groups = templates$W,
+					 stratAssign_fallback = stratFallback, stratAssign_comp = stratComp, 
+					 alpha_ci = .1, output_type = "summary")
+```
+
+There are two parts of the summary output. The first is a tibble with escapement estimates
+and CIs for all groups (rear, var1, var2) estimated 
+
+```{r}
+est_escp$output
+```
+
+and the second is the point estiamtes and CIs for the total escapement and the three rear types.
+
+```{r}
+est_escp$rearType
+```
+
+There are other output types you can request that may be of use. One is the "full" output.
+
+```{r}
+est_escp <- apply_fallback_rates(breakdown = est_comp, fallback_rates = nf$fallback_rates,
+					 split_H_fallback = "var1",
+					 split_HNC_fallback = "var1",
+					 split_W_fallback = "var1",
+					 H_groups = templates$H, HNC_groups = templates$HNC, 
+					 W_groups = templates$W,
+					 stratAssign_fallback = stratFallback, stratAssign_comp = stratComp, 
+					 alpha_ci = .1, output_type = "full")
+est_escp
+```
+
+This has a lot. The first is the same tibble with point estiamtes and CIs. Then the "full_breakdown_*" 
+have the point estimates by strata and the "boot_breakdown_*" have the estimates by strata for each bootstrap iteration.
+These are mostly useful to do fancy things that aren't explicitly programmed into the package. For example, 
+if you want to know the overall fallback rates and get their 90% CIs, you can do something like this
+
+```{r}
+# calculate point estiamte of overall fallback rate
+fallPoint <- est_comp[[1]] %>% filter(is.na(var2)) %>% group_by(rear, var1) %>%
+	summarise(total = sum(total)) %>% 
+	full_join(est_escp$output %>% filter(is.na(var2))) %>% 
+	left_join(bind_rows(templates$H %>% mutate(rear = "H"), templates$HNC %>% mutate(rear = "HNC"), 
+							  templates$W %>% mutate(rear = "W"))) %>% group_by(stockGroup) %>%
+	summarise(total = sum(total), pointEst = sum(pointEst)) %>%
+	mutate(p_fa = 1 - (pointEst / total))
+
+# get full output to calculate CIs
+full <- apply_fallback_rates(breakdown = est_comp, fallback_rates = nf$fallback_rates,
+									  split_H_fallback = "var1",
+									  split_HNC_fallback = "var1",
+									  split_W_fallback = "var1",
+									  H_groups = templates$H, HNC_groups = templates$HNC, W_groups = templates$W,
+									  stratAssign_fallback = stratFallback, stratAssign_comp = stratComp, alpha_ci = .1,
+									  output_type = "full")
+fallCI <- bind_rows(full$boot_breakdown_H, full$boot_breakdown_HNC, full$boot_breakdown_W) %>%
+	filter(is.na(var2)) %>% group_by(boot, rear, var1) %>%
+	summarise(escapement = sum(total)) %>% 
+	full_join(est_comp[[2]] %>% filter(is.na(var2)) %>% group_by(boot, rear, var1) %>%
+				 	summarise(total = sum(total))) %>% 
+	left_join(bind_rows(templates$H %>% mutate(rear = "H"), templates$HNC %>% mutate(rear = "HNC"), 
+							  templates$W %>% mutate(rear = "W"))) %>% group_by(boot, stockGroup) %>%
+	summarise(total = sum(total), escapement = sum(escapement)) %>%
+	mutate(p_fa = 1 - (escapement / total)) %>% group_by(stockGroup) %>%
+	summarise(lci = quantile(p_fa, .05), uci = quantile(p_fa, .95))
+full_join(fallPoint, fallCI)
+```
+
+And there is a third output
+
+```{r}
+est_escp <- apply_fallback_rates(breakdown = est_comp, fallback_rates = nf$fallback_rates,
+					 split_H_fallback = "var1",
+					 split_HNC_fallback = "var1",
+					 split_W_fallback = "var1",
+					 H_groups = templates$H, HNC_groups = templates$HNC, 
+					 W_groups = templates$W,
+					 stratAssign_fallback = stratFallback, stratAssign_comp = stratComp, 
+					 alpha_ci = .1, output_type = "W_boot")
+est_escp
+```
+
+The first output is again the same first summary table. The second is a tibble with one 
+row for each bootstrap iteration and one column for each stratum. The values are the estimated
+number of wild fish for that stratum and iteration. This is intended to be used (with some minor 
+formatting) as input for DABOM.
+

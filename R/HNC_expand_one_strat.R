@@ -149,6 +149,8 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 			if(nrow(ptTrap) > 0){
 				estim <- PBT_expand_calc_MLE(ptTrap[[v1]], tagRates) %>%
 					mutate(total = prop * wc_expanded * (1 - pClip) * pPhys)
+				estim_phystag_v2 <- estim %>% mutate(rear = NA, var2 = NA) %>%
+					rename(var1 = group) %>% select(rear, var1, var2, total)
 			} else if(pPhys > 0){
 				# missing data issues, skip this bootstrap or throw an error
 				# print("testing HNC v1.1 NULL")
@@ -184,7 +186,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 			# non - phystag
 			# expand into unmarked untagged fish
 			uptTrap <- tempTrap %>% filter(!physTag, !is.na(pbtAssign)) # so AI, no phystag, genotyped fish
-			if(nrow(uptTrap) > 0){
+			if(nrow(uptTrap) > 0 & any(uptTrap$pbtAssign)){
 				v1Data <- tibble(var1 = uptTrap[[pbt_var]], var2 = uptTrap[[v1]]) %>%
 					count(var1, var2)
 				v1Data <- v1Data %>% complete(var1, var2, fill = list(n = 0)) %>%
@@ -206,7 +208,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 				tempEstim <- tibble()
 				for(i in 1:nrow(varProbs)){
 					tempEstim <- bind_rows(tempEstim, tibble(group = rownames(varProbs)[i],
-																		  var1 = colnames(varProbs)[i],
+																		  var1 = colnames(varProbs),
 																		  prop_var2 = varProbs[i,]))
 				}
 				estim <- bind_rows(estim,
@@ -230,13 +232,117 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 
 		# var2
 		if(!is.null(v2)){
-			if(v1 != pbt_var) stop("MLE is not currently an option for estimating the composition of HNC with two variables")
+			if(v1 != pbt_var) stop("MLE is not currently an option for estimating the composition of HNC with two variables unless the first is the pbt_var")
+
+			##### begin copy and paste
+
+
 			# need to calculate comp for phystag and unphystag separately then add together
 			# easiest to implement when PBT group is first variable since total and unphystag are already calculated
-			#
-			# not implementing now b/c previous scobi analyses don't use it
-			# can implement later
-			# it is implemented for the "accounting" method
+
+			# first check for data in each category
+			tempTrap_check <- tempTrap %>% filter(physTag | pbtAssign, !is.na(!!as.symbol(v2)))
+			tempv2Data <- tibble(var1 = tempTrap_check[[v1]], var2 = tempTrap_check[[v2]]) %>%
+				count(var1, var2)
+			rm(tempTrap_check)
+			sampleCount <- estim %>% filter(total > 0) %>% select(var1, total) %>% full_join(tempv2Data, by = "var1") %>%
+				mutate(n = replace_na(n, 0)) %>% group_by(var1) %>%
+				summarise(totNum = sum(n), .groups = "drop") %>% pull(totNum)
+			# need to skip this iteration if bootstrapping, or throw an error if finding point estimate
+			#  b/c no data to estimate composition of a subgroup (all samples are missing data)
+			if(any(sampleCount < 1)){
+				# print("testing HNC NULL v2")
+				return(NULL)
+			}
+
+			ptTrap <- tempTrap %>% filter(physTag, !is.na(!!as.symbol(v2)))
+			tempEstim <- tibble()
+			if(nrow(ptTrap) > 0){
+				v2Data <- tibble(var1 = ptTrap[[v1]], var2 = ptTrap[[v2]]) %>%
+					count(var1, var2)
+				if(!"Unassigned" %in% v2Data$var1 || !any(v2Data$var1 != "Unassigned")){
+					#### handle when all fish assigned
+					#### handle when all fish unassigned
+					tempEstim <- v2Data %>% group_by(var1) %>% mutate(prop = n / sum(n), .groups = "drop")
+				} else {
+					#### handle when a mix of assigned and unassigned
+					v2Data <- v2Data %>% complete(var1, var2, fill = list(n = 0)) %>%
+						spread(var2, n)
+					# put unassigned at the end
+					v2Data <- bind_rows(v2Data %>% filter(var1 != "Unassigned"),
+											  v2Data %>% filter(var1 == "Unassigned"))
+					rn <- v2Data$var1
+					v2Data <- v2Data %>% select(-var1) %>% as.matrix()
+					rownames(v2Data) <- rn
+					# v2Data is now matrix with counts, rows are var1, cols are var2
+					piGroup <- tibble(group = rn) %>%
+						left_join(estim_phystag_v2 %>% rename(group = var1) %>%
+									 	mutate(prop = total/sum(total)), by = "group") %>%
+						pull(prop)
+					# piGroup is now a vector of "known" proportions of each group in order of rows
+					tempTagRates <- tibble(group = rn) %>% left_join(tagRates, by = "group") %>% pull(tagRate)
+
+					# now run MLE routine with known piGroup
+					varProbs <- PBT_var2_calc_MLE(v2Data = v2Data, piGroup = piGroup, tagRates = tempTagRates)
+					for(i in 1:nrow(varProbs)){
+						tempEstim <- bind_rows(tempEstim, tibble(var1 = rownames(varProbs)[i],
+																			  var2 = colnames(varProbs),
+																			  prop = varProbs[i,]))
+					}
+				}
+
+				tempEstim <- tempEstim %>% left_join(estim_phystag_v2 %>% select(var1, total), by = "var1") %>%
+						mutate(total = prop * total # multiply proportion by total number of fish
+							) %>% select(var1, var2, total)
+			} else if(pPhys > 0){
+				# missing data issues, skip this bootstrap or throw an error
+				# print("testing HNC v1.2 NULL")
+				return(NULL)
+			}
+			rm(ptTrap)
+			# non - phystag
+			# expand into unmarked untagged fish
+			uptTrap <- tempTrap %>% filter(!physTag, !is.na(pbtAssign), !is.na(!!as.symbol(v2))) # so AI, no phystag, genotyped fish
+			if(nrow(uptTrap) > 0 & any(uptTrap$pbtAssign)){
+				v1Data <- tibble(var1 = uptTrap[[pbt_var]], var2 = uptTrap[[v2]]) %>%
+					count(var1, var2)
+				v1Data <- v1Data %>% complete(var1, var2, fill = list(n = 0)) %>%
+					spread(var2, n)
+				# put unassigned at the end
+				v1Data <- bind_rows(v1Data %>% filter(var1 != "Unassigned"),
+										  v1Data %>% filter(var1 == "Unassigned"))
+				rn <- v1Data$var1
+				v1Data <- v1Data %>% select(-var1) %>% as.matrix()
+				rownames(v1Data) <- rn
+				# v1Data is now matrix with counts, rows are var1, cols are var2
+				piGroup <- tibble(group = rn) %>% left_join(unmark_pbt_prop, by = "group") %>%
+					mutate(prop = prop / sum(prop)) %>% pull(prop)
+				# piGroup is now a vector of "known" proportions of each group in order of rows
+				tempTagRates <- tibble(group = rn) %>% left_join(tagRates, by = "group") %>% pull(tagRate)
+
+				# now run MLE routine with known piGroup
+				varProbs <- PBT_var2_calc_MLE(v2Data = v1Data, piGroup = piGroup, tagRates = tempTagRates)
+				tempEstim2 <- tibble()
+				for(i in 1:nrow(varProbs)){
+					tempEstim2 <- bind_rows(tempEstim2, tibble(group = rownames(varProbs)[i],
+																		  var2 = colnames(varProbs),
+																		  prop_var2 = varProbs[i,]))
+				}
+				tempEstim <- bind_rows(tempEstim,
+										 tempEstim2 %>% left_join(unmark_pbt_prop, by = "group") %>%
+										 	mutate(total = prop_var2 * prop * wc_expanded * (1 - pClip) * (1 - pPhys)) %>%
+										 	filter(group != "Unassigned") %>% rename(var1 = group) %>%
+										 	select(var1, var2, total)
+				) %>% group_by(var1, var2) %>% summarise(total = sum(total), .groups = "drop")
+			} else if(!all.equal(((1 - pPhys) * pPBTonly), 0)){
+				# missing data issues, skip this bootstrap or throw an error
+				# print("testing HNC v1.3 NULL")
+				return(NULL)
+			}
+			rm(uptTrap)
+
+			estimates <- estimates %>% bind_rows(
+				tempEstim %>% mutate(rear = "HNC") %>% select(rear, var1, var2, total))
 		}
 	}
 
