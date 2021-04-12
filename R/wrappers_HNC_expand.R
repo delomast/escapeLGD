@@ -27,6 +27,7 @@ HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 	# checking inputs
 	temp_ac <- unique(trap[[adclip_var]])
 	if(any(is.na(temp_ac) | !(temp_ac %in% c("AD", "AI")))) stop("All adclip_var values must be either AD or AI (no NA or other values allowed)")
+	if(!is.logical(trap[[physTag_var]]) || any(is.na(trap[[physTag_var]]))) stop("All physTag_var must be either TRUE or FALSE (NA not allowed)")
 	if(length(H_vars) < 1 || length(H_vars) > 2) stop("H_vars must be one or two column names")
 	if(length(HNC_vars) < 1 || length(HNC_vars) > 2) stop("HNC_vars must be one or two column names")
 	if(length(W_vars) < 1 || length(W_vars) > 2) stop("W_vars must be one or two column names")
@@ -157,6 +158,7 @@ HNC_expand_unkGSI <- function(trap, stratAssign_comp, boots = 2000,
 	# checking inputs
 	temp_ac <- unique(trap[[adclip_var]])
 	if(any(is.na(temp_ac) | !(temp_ac %in% c("AD", "AI")))) stop("All adclip_var values must be either AD or AI (no NA or other values allowed)")
+	if(!is.logical(trap[[physTag_var]]) || any(is.na(trap[[physTag_var]]))) stop("All physTag_var must be either TRUE or FALSE (NA not allowed)")
 	if(length(H_vars) < 1 || length(H_vars) > 2) stop("H_vars must be one or two column names")
 	if(length(HNC_vars) < 1 || length(HNC_vars) > 2) stop("HNC_vars must be one or two column names")
 	if(length(W_vars) < 1 || length(W_vars) > 2) stop("W_vars must be one or two column names")
