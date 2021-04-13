@@ -267,8 +267,8 @@ We need
   attempted to be assigned but did not and "NA" for fish that were not genotyped) (`releaseGroup`)
 * A variable giving the statistical week (`sWeek`)
 * A variable denoting if a sample was recorded as having a physical tag denoting it of hatchery 
-  origin ("TRUE") or not ("FALSE"). If samples were not assessed for physical tags, they should
-  be given a value of "FALSE". (`physTag`)
+  origin ("TRUE") or not ("FALSE"). If no samples were assessed for physical tags, they should
+  all be given a value of "FALSE". (`physTag`)
 * A variable denoting if a sample for ad-clipped ("AD") or ad-intact ("AI"). No other values
   (including "NA") are allowed. (`LGDMarkAD`)
 * Any other variables that you are estimating composition for (`GenStock`, `lenCat`)
