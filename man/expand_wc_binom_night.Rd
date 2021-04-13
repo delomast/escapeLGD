@@ -15,7 +15,7 @@ expand_wc_binom_night(
 )
 }
 \arguments{
-\item{nightPassage_rates}{one of the outputs of \code{nightFall}}
+\item{nightPassage_rates}{the night passage rate part of the output of \code{nightFall}}
 
 \item{wc}{tibble with two columns sWeek and wc. sWeek is statistical week and wc is the count of fish (NOT expanded for wc_prop)}
 
@@ -26,6 +26,10 @@ for composition estimation using the trap data}
 
 \item{stratAssign_night}{tibble with sWeek, stratum showing what stratum each sWeek corresponds to
 for nighttime passage}
+
+\item{boots}{The number of bootstap iterations to run}
+
+\item{alpha_ci}{The alpha value to use for calculating the CI of overall nighttime passage rate}
 }
 \description{
 estimate and bootstrap window count as a binomial and expanding for nighttime passage

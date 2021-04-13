@@ -1,6 +1,23 @@
 # wrappers for HNC expand and variable GSI
 
-#' treats GSI as known
+#' Estimates the composition of ascensions and treats GSI as known
+#' @param trap a tibble with data about the trapped fish
+#' @param stratAssign_comp tibble with sWeek, stratum showing what stratum each sWeek corresponds to
+#'   for composition estimation using the trap data
+#' @param boots The number of bootstap iterations to run
+#' @param pbt_var The column name of the PBT group variable (tag rates are defined for these groups)
+#' @param timestep_var The column name of the timestep variable (corresponds to sWeek in \code{stratAssign_comp})
+#' @param physTag_var The column name of a logical variable defining whether or not
+#'   a sample had a physical tag (e.g. CWT) identifying it as hatchery origin with 100% certainty
+#' @param adclip_var The column name of the variable defining ad-fin status (values are "AD" or "AI")
+#' @param tagRates A tibble with two columns, the first listing PBT groups and the second giving their tag rates
+#' @param H_vars A character vector defining one or two variables to estimate composition of the H group
+#' @param HNC_vars A character vector defining one or two variables to estimate composition of the HNC group.
+#'   If method is "MLE" and two variables are defined, the first must be the pbt_var.
+#' @param W_vars A character vector defining one or two variables to estimate composition of the W group
+#' @param wc_binom The output of \code{expand_wc_binom_night}
+#' @param method Either "Account" to use the accounting style estimator or "MLE" to use
+#'   the maximum likelihood estimator
 #' @import dplyr
 #' @import tibble
 #' @import readr
@@ -130,8 +147,10 @@ HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 
 
 
-#' Treats GSI as unknown
-#' @param GSI_draws a tibble wiht the first column individuals names, the rest GSI
+#' Estimates the composition of ascensions and incorporates uncertainty in
+#' GSI assignments
+#' @inheritParams HNC_expand
+#' @param GSI_draws a tibble with the first column individuals names, the rest GSI
 #'   values fro draws from the posterior (each column a draw). Used in order.
 #' @param n_point number of iterations in the bootstrap loop (only resampling GSI values)
 #'   for calculating point estimates

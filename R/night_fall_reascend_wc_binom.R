@@ -11,6 +11,12 @@
 #'   corresponds to for each stockGroup
 #' @param stratAssign_night tibble with sWeek, stratum showing what stratum each sWeek corresponds to
 #'   for nighttime passage
+#' @param boots The number of bootstap iterations to run
+#' @param full_spillway tibble with "sWeek", "stockGroup", "laterAscend", "totalFall" columns. totalFall
+#'   gives the number of PIT ascensions that were detected (with the spillway array) falling back and laterAscend
+#'   gives the number of these that later reascended. If a strata has a summed value of 0 for totalFall,
+#'   it will be assumed that all fallbacks result in reascension in that stratum. If a value of NULL is input
+#'   for this, it will be assume that all fallbakcs result in reascension in all strata.
 #'
 #' @export
 nightFall <- function(full_reascend, full_night, stratAssign_fallback, stratAssign_night,
@@ -111,13 +117,15 @@ nightFall <- function(full_reascend, full_night, stratAssign_fallback, stratAssi
 
 
 #' estimate and bootstrap window count as a binomial and expanding for nighttime passage
-#' @param nightPassage_rates one of the outputs of \code{nightFall}
+#' @param nightPassage_rates the night passage rate part of the output of \code{nightFall}
 #' @param wc tibble with two columns sWeek and wc. sWeek is statistical week and wc is the count of fish (NOT expanded for wc_prop)
 #' @param wc_prop the proportion of the time fish are counted (e.g. 5/6)
 #' @param stratAssign_night tibble with sWeek, stratum showing what stratum each sWeek corresponds to
 #'   for nighttime passage
 #' @param stratAssign_comp tibble with sWeek, stratum showing what stratum each sWeek corresponds to
 #'   for composition estimation using the trap data
+#' @param boots The number of bootstap iterations to run
+#' @param alpha_ci The alpha value to use for calculating the CI of overall nighttime passage rate
 #' @export
 expand_wc_binom_night <- function(nightPassage_rates, wc, wc_prop, stratAssign_comp, stratAssign_night,
 											 boots = 2000, alpha_ci = .1){

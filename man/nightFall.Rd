@@ -26,6 +26,14 @@ corresponds to for each stockGroup}
 
 \item{stratAssign_night}{tibble with sWeek, stratum showing what stratum each sWeek corresponds to
 for nighttime passage}
+
+\item{boots}{The number of bootstap iterations to run}
+
+\item{full_spillway}{tibble with "sWeek", "stockGroup", "laterAscend", "totalFall" columns. totalFall
+gives the number of PIT ascensions that were detected (with the spillway array) falling back and laterAscend
+gives the number of these that later reascended. If a strata has a summed value of 0 for totalFall,
+it will be assumed that all fallbacks result in reascension in that stratum. If a value of NULL is input
+for this, it will be assume that all fallbakcs result in reascension in all strata.}
 }
 \description{
 estimate fallback, reascension, and nighttime passage

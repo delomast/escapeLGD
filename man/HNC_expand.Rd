@@ -2,7 +2,7 @@
 % Please edit documentation in R/wrappers_HNC_expand.R
 \name{HNC_expand}
 \alias{HNC_expand}
-\title{treats GSI as known}
+\title{Estimates the composition of ascensions and treats GSI as known}
 \usage{
 HNC_expand(
   trap,
@@ -20,6 +20,37 @@ HNC_expand(
   method = c("Account", "MLE")
 )
 }
+\arguments{
+\item{trap}{a tibble with data about the trapped fish}
+
+\item{stratAssign_comp}{tibble with sWeek, stratum showing what stratum each sWeek corresponds to
+for composition estimation using the trap data}
+
+\item{boots}{The number of bootstap iterations to run}
+
+\item{pbt_var}{The column name of the PBT group variable (tag rates are defined for these groups)}
+
+\item{timestep_var}{The column name of the timestep variable (corresponds to sWeek in \code{stratAssign_comp})}
+
+\item{physTag_var}{The column name of a logical variable defining whether or not
+a sample had a physical tag (e.g. CWT) identifying it as hatchery origin with 100% certainty}
+
+\item{adclip_var}{The column name of the variable defining ad-fin status (values are "AD" or "AI")}
+
+\item{tagRates}{A tibble with two columns, the first listing PBT groups and the second giving their tag rates}
+
+\item{H_vars}{A character vector defining one or two variables to estimate composition of the H group}
+
+\item{HNC_vars}{A character vector defining one or two variables to estimate composition of the HNC group.
+If method is "MLE" and two variables are defined, the first must be the pbt_var.}
+
+\item{W_vars}{A character vector defining one or two variables to estimate composition of the W group}
+
+\item{wc_binom}{The output of \code{expand_wc_binom_night}}
+
+\item{method}{Either "Account" to use the accounting style estimator or "MLE" to use
+the maximum likelihood estimator}
+}
 \description{
-treats GSI as known
+Estimates the composition of ascensions and treats GSI as known
 }
