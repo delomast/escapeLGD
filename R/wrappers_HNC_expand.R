@@ -8,7 +8,7 @@
 #' @param pbt_var The column name of the PBT group variable (tag rates are defined for these groups)
 #' @param timestep_var The column name of the timestep variable (corresponds to sWeek in \code{stratAssign_comp})
 #' @param physTag_var The column name of a logical variable defining whether or not
-#'   a sample had a physical tag (e.g. CWT) identifying it as hatchery origin with 100% certainty
+#'   a sample had a physical tag (e.g. CWT) identifying it as hatchery origin with 100\% certainty
 #' @param adclip_var The column name of the variable defining ad-fin status (values are "AD" or "AI")
 #' @param tagRates A tibble with two columns, the first listing PBT groups and the second giving their tag rates
 #' @param H_vars A character vector defining one or two variables to estimate composition of the H group

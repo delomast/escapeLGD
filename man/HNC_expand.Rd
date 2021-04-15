@@ -33,7 +33,7 @@ for composition estimation using the trap data}
 \item{timestep_var}{The column name of the timestep variable (corresponds to sWeek in \code{stratAssign_comp})}
 
 \item{physTag_var}{The column name of a logical variable defining whether or not
-a sample had a physical tag (e.g. CWT) identifying it as hatchery origin with 100% certainty}
+a sample had a physical tag (e.g. CWT) identifying it as hatchery origin with 100\% certainty}
 
 \item{adclip_var}{The column name of the variable defining ad-fin status (values are "AD" or "AI")}
 
