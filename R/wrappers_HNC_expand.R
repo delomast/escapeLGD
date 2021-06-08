@@ -78,21 +78,37 @@ HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 	full_breakdown <- tibble()
 	# point estimate
 	for(s in unique(stratAssign_comp$stratum)){
-		if(method == "Account"){
-			stratRes <- HNC_expand_one_strat(trap = trap %>% filter(stratum == s), H_vars = H_vars,
-														HNC_vars = HNC_vars,
-														W_vars = W_vars,
-														wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
-														pbt_var = pbt_var, tagRates = tagRates)
-		} else if (method == "MLE"){
-			stratRes <- HNC_expand_one_strat_MLE(trap = trap %>% filter(stratum == s), H_vars = H_vars,
-														HNC_vars = HNC_vars,
-														W_vars = W_vars,
-														wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
-														pbt_var = pbt_var, tagRates = tagRates)
-		} else {
-			stop("Error in method selection")
+		# seems there are intermittent bugs in some tidyverse operations. Trying to catch them here.
+		countTry <- 0
+		while(countTry < 3){
+			stratRes <- tryCatch(expr = {
+					if(method == "Account"){
+						HNC_expand_one_strat(trap = trap %>% filter(stratum == s), H_vars = H_vars,
+																	HNC_vars = HNC_vars,
+																	W_vars = W_vars,
+																	wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
+																	pbt_var = pbt_var, tagRates = tagRates)
+					} else if (method == "MLE"){
+						HNC_expand_one_strat_MLE(trap = trap %>% filter(stratum == s), H_vars = H_vars,
+																	HNC_vars = HNC_vars,
+																	W_vars = W_vars,
+																	wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
+																	pbt_var = pbt_var, tagRates = tagRates)
+					}
+			},
+			error = function(e){
+				return(e$message)
+			})
+			if(is.character(stratRes)){
+				countTry <- countTry + 1
+			} else {
+				break
+			}
 		}
+		if(is.character(stratRes)){
+			stop(stratRes)
+		}
+
 		if(is.null(stratRes)) stop("Need complete cases for all quantities in stratum ", s)
 		full_breakdown <- full_breakdown %>% bind_rows(stratRes$estimates %>% mutate(stratum = s))
 	}
@@ -108,21 +124,37 @@ HNC_expand <- function(trap, stratAssign_comp, boots = 2000,
 			while(TRUE){
 				bootData <- trap %>% filter(stratum == s) %>%
 											 	sample_n(nrow(.), replace = TRUE)
-				if(method == "Account"){
-					bootRes <- HNC_expand_one_strat(trap = bootData, H_vars = H_vars,
-															  HNC_vars = HNC_vars,
-															  W_vars = W_vars,
-															  wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
-															  pbt_var = pbt_var, tagRates = tagRates)
-				} else if (method == "MLE"){
-					bootRes <- HNC_expand_one_strat_MLE(trap = bootData, H_vars = H_vars,
-																	HNC_vars = HNC_vars,
-																	W_vars = W_vars,
-																	wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
-																	pbt_var = pbt_var, tagRates = tagRates)
-				} else {
-					stop("Error in method selection")
+				# seems there are intermittent bugs in some tidyverse operations. Trying to catch them here.
+				countTry <- 0
+				while(countTry < 3){
+					bootRes <- tryCatch(expr = {
+						if(method == "Account"){
+							HNC_expand_one_strat(trap = bootData, H_vars = H_vars,
+																	  HNC_vars = HNC_vars,
+																	  W_vars = W_vars,
+																	  wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
+																	  pbt_var = pbt_var, tagRates = tagRates)
+						} else if (method == "MLE"){
+							HNC_expand_one_strat_MLE(trap = bootData, H_vars = H_vars,
+																			HNC_vars = HNC_vars,
+																			W_vars = W_vars,
+																			wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
+																			pbt_var = pbt_var, tagRates = tagRates)
+						}
+					},
+					error = function(e){
+						return(e$message)
+					})
+					if(is.character(bootRes)){
+						countTry <- countTry + 1
+					} else {
+						break
+					}
 				}
+				if(is.character(bootRes)){
+					stop(bootRes)
+				}
+
 				totalIter <- totalIter + 1
 				if(totalIter %% 100 == 0 && skipped / totalIter > .1) message((skipped / totalIter) * 100,
 					" % of iterations are being skipped due to missing complete cases. ",
@@ -219,21 +251,38 @@ HNC_expand_unkGSI <- function(trap, stratAssign_comp, boots = 2000,
 		# update GSI assignments
 		bootData_point[[GSI_var]] <- GSI_draws[[i+1]][ind_matches] # first column is ind names
 		for(s in unique(stratAssign_comp$stratum)){
-			if(method == "Account"){
-				bootRes_point <- HNC_expand_one_strat(trap = bootData_point %>% filter(stratum == s), H_vars = H_vars,
-																  HNC_vars = HNC_vars,
-																  W_vars = W_vars,
-																  wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
-																  pbt_var = pbt_var, tagRates = tagRates)
-			} else if (method == "MLE"){
-				bootRes_point <- HNC_expand_one_strat_MLE(trap = bootData_point %>% filter(stratum == s), H_vars = H_vars,
-																  HNC_vars = HNC_vars,
-																  W_vars = W_vars,
-																  wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
-																  pbt_var = pbt_var, tagRates = tagRates)
-			} else {
-				stop("Error in method selection")
+			# seems there are intermittent bugs in some tidyverse operations. Trying to catch them here.
+			countTry <- 0
+			while(countTry < 3){
+				bootRes_point <- tryCatch(expr = {
+					if(method == "Account"){
+						HNC_expand_one_strat(trap = bootData_point %>% filter(stratum == s), H_vars = H_vars,
+																		  HNC_vars = HNC_vars,
+																		  W_vars = W_vars,
+																		  wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
+																		  pbt_var = pbt_var, tagRates = tagRates)
+					} else if (method == "MLE"){
+						HNC_expand_one_strat_MLE(trap = bootData_point %>% filter(stratum == s), H_vars = H_vars,
+																				HNC_vars = HNC_vars,
+																				W_vars = W_vars,
+																				wc_expanded = wc_binom[[1]] %>% filter(stratum == s) %>% pull(wc),
+																				pbt_var = pbt_var, tagRates = tagRates)
+					}
+				},
+				error = function(e){
+					return(e$message)
+				})
+				if(is.character(bootRes_point)){
+					countTry <- countTry + 1
+				} else {
+					break
+				}
 			}
+			if(is.character(bootRes_point)){
+				stop(bootRes_point)
+			}
+
+
 			if(is.null(bootRes_point)) stop("Need complete cases for all quantities in stratum ", s)
 			full_breakdown <- full_breakdown %>% bind_rows(bootRes_point$estimates %>% mutate(stratum = s, boot = i))
 		}
@@ -263,21 +312,37 @@ HNC_expand_unkGSI <- function(trap, stratAssign_comp, boots = 2000,
 				# update GSI assignments
 				ind_matches <- match(bootData$Ind, GSI_draws[[1]])
 				bootData[[GSI_var]] <- GSI_draws[[b+1]][ind_matches] # first column is ind names
-				if(method == "Account"){
-					bootRes <- HNC_expand_one_strat(trap = bootData, H_vars = H_vars,
-															  HNC_vars = HNC_vars,
-															  W_vars = W_vars,
-															  wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
-															  pbt_var = pbt_var, tagRates = tagRates)
-				} else if (method == "MLE"){
-					bootRes <- HNC_expand_one_strat_MLE(trap = bootData, H_vars = H_vars,
-																	HNC_vars = HNC_vars,
-																	W_vars = W_vars,
-																	wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
-																	pbt_var = pbt_var, tagRates = tagRates)
-				} else {
-					stop("Error in method selection")
+				# seems there are intermittent bugs in some tidyverse operations. Trying to catch them here.
+				countTry <- 0
+				while(countTry < 3){
+					bootRes <- tryCatch(expr = {
+						if(method == "Account"){
+							HNC_expand_one_strat(trap = bootData, H_vars = H_vars,
+																	  HNC_vars = HNC_vars,
+																	  W_vars = W_vars,
+																	  wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
+																	  pbt_var = pbt_var, tagRates = tagRates)
+						} else if (method == "MLE"){
+							HNC_expand_one_strat_MLE(trap = bootData, H_vars = H_vars,
+																			HNC_vars = HNC_vars,
+																			W_vars = W_vars,
+																			wc_expanded = wc_binom[[2]][b, which(wc_binom[[1]]$stratum == s)],
+																			pbt_var = pbt_var, tagRates = tagRates)
+						}
+					},
+					error = function(e){
+						return(e$message)
+					})
+					if(is.character(bootRes)){
+						countTry <- countTry + 1
+					} else {
+						break
+					}
 				}
+				if(is.character(bootRes)){
+					stop(bootRes)
+				}
+
 				totalIter <- totalIter + 1
 				if(totalIter %% 100 == 0 && skipped / totalIter > .1) message((skipped / totalIter) * 100,
 					" % of iterations are being skipped due to missing complete cases. ",
