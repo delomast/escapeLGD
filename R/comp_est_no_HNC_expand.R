@@ -8,7 +8,7 @@ ascension_composition <- function(trap, stratAssign_comp, boots = 2000,
 	# make sure no reserved column names are used
 	if(any(colnames(trap) %in% c("stratum", "pbtAssign"))) stop("stratum and pbtAssign are reserved column names and must not be used as column names in trap")
 
-	trap <- trap %>% left_join(stratAssign_comp, by = "sWeek")
+	trap <- trap %>% mutate(pbtAssign = TRUE) %>% left_join(stratAssign_comp, by = "sWeek")
 	allStrat <- unique(c(stratAssign_comp$stratum))
 	trap$pbtAssign[trap[[pbt_var]] == "Unassigned"] <- FALSE
 	trap$pbtAssign[is.na(trap[[pbt_var]])] <- NA
