@@ -5,10 +5,13 @@ ascension_composition <- function(trap, stratAssign_comp, boots = 2000,
 											 pbt_var = NULL, tagRates = NULL,
 											 H_vars, HNC_vars, W_vars, wc_binom){
 
-	# need check for colomn names in trap (can't include "stratum"), or special handling if it does
+	# make sure no reserved column names are used
+	if(any(colnames(trap) %in% c("stratum", "pbtAssign"))) stop("stratum and pbtAssign are reserved column names and must not be used as column names in trap")
 
 	trap <- trap %>% left_join(stratAssign_comp, by = "sWeek")
 	allStrat <- unique(c(stratAssign_comp$stratum))
+	trap$pbtAssign[trap[[pbt_var]] == "Unassigned"] <- FALSE
+	trap$pbtAssign[is.na(trap[[pbt_var]])] <- NA
 
 	AD_rates <- list(tibble())
 	AD_rates[[2]] <- matrix(nrow = boots, ncol = length(allStrat))
