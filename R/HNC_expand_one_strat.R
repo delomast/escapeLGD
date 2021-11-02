@@ -48,7 +48,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 		if(v1 == pbt_var){
 			estim <- PBT_expand_calc_MLE(tempTrap[[v1]], tagRates)
 		} else {
-			props <- table(tempTrap[[v2]]) # removes NAs automatically
+			props <- table(tempTrap[[v1]])
 			estim <- tibble(group = names(props), prop = as.numeric(props/sum(props)))
 		}
 		# multiplying by expanded window count and other proportions then organizing output
