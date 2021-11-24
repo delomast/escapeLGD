@@ -55,7 +55,28 @@ splitByPIT <- function(est_comp, splitByPITinput){
 			)
 		}
 		toBind <- toBind %>% group_by(boot, stockGroup) %>% summarise(r = sum(bootPoint), .groups = "drop_last") %>%
-			mutate(r = r / sum(r), var1 = g) %>% ungroup()
+			mutate(sumR = sum(r), r = r / sum(r), var1 = g) %>% ungroup()
+		if(any(toBind$sumR == 0)){
+			# all bootstraps must be conditional on at least one PIT tagged fish being observed in each release group
+			toBind2 <- tibble()
+			toRepeat <- toBind %>% filter(sumR == 0) %>% select(boot, var1) %>% distinct
+			for(i in 1:nrow(toRepeat)){
+				while(TRUE){
+					newValues <- tibble()
+					for(j in 1:nrow(tempSplit)){
+						newValues <- newValues %>% bind_rows(
+							tibble(boot = toRepeat$boot[i], stockGroup = tempSplit$stockGroup[j],
+									 bootPoint = rbinom(1, round(tempSplit$point[j]), tempSplit$tagRatePIT[j]) / tempSplit$tagRatePIT[j])
+						)
+					}
+					if(sum(newValues$bootPoint) > 0) break
+				}
+				toBind2 <- bind_rows(toBind2, newValues)
+			}
+			toBind2 <- toBind2 %>% group_by(boot, stockGroup) %>% summarise(r = sum(bootPoint), .groups = "drop_last") %>%
+				mutate(sumR = sum(r), r = r / sum(r), var1 = g) %>% ungroup()
+			toBind <- toBind %>% filter(sumR > 0) %>% bind_rows(toBind2)
+		}
 		toBind <- est_comp[[2]] %>% filter(rear %in% c("H", "HNC"), var1 == g) %>%
 			full_join(toBind, by = c("boot", "var1")) %>%
 			mutate(var1 = paste0(var1, "_", stockGroup), total = total * r) %>% select(boot, stratum, rear, var1, var2, total)
