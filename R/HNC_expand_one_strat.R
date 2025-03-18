@@ -218,7 +218,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 							group_by(var1) %>% summarise(total = sum(total), .groups = "drop") %>% select(var1, total) %>%
 							rename(group = var1)
 					) %>% group_by(group) %>% summarise(total = sum(total), .groups = "drop")
-			} else if(!all.equal(((1 - pPhys) * pPBTonly), 0)){
+			} else if(is.character(all.equal(((1 - pPhys) * pPBTonly), 0)) || !all.equal(((1 - pPhys) * pPBTonly), 0)){
 				# missing data issues, skip this bootstrap or throw an error
 				# print("testing HNC v1.3 NULL")
 				return(NULL)
@@ -334,7 +334,7 @@ HNC_expand_one_strat_MLE <- function(trap, H_vars, HNC_vars, W_vars, wc_expanded
 										 	filter(group != "Unassigned") %>% rename(var1 = group) %>%
 										 	select(var1, var2, total)
 				) %>% group_by(var1, var2) %>% summarise(total = sum(total), .groups = "drop")
-			} else if(!all.equal(((1 - pPhys) * pPBTonly), 0)){
+			} else if(is.character(all.equal(((1 - pPhys) * pPBTonly), 0)) || !all.equal(((1 - pPhys) * pPBTonly), 0)){
 				# missing data issues, skip this bootstrap or throw an error
 				# print("testing HNC v1.3 NULL")
 				return(NULL)
