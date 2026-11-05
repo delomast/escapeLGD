@@ -112,16 +112,33 @@ PBT_grad <- function(par, nGroups, nUntag, tagRates){
 
 
 #' MLE estimates composition for var2 within PBT groups
+#'
+#' The likelihood is maximized with BFGS from two starting points and the fit with the
+#' higher log-likelihood is kept: (1) all parameters equal (equal proportions within each
+#' row, the original starting point) and (2) the observed proportions within each row,
+#' log(count + 0.5). From the equal-proportion start alone, BFGS can stop with some
+#' proportions pushed to the softmax boundary (near 0) while still reporting convergence,
+#' at a log-likelihood far below the maximum. Keeping the better of the two fits can only
+#' raise the log-likelihood, so it never returns a worse fit than the single start.
 #' @param tagRates a tibble with release group as "group" and tag rate as "tagRate"
 #' @return returns a matrix with PBT group/Unassigned as rows and var2 as cols, and props within each group as values
 #' @keywords internal
 #' @noRd
 PBT_var2_calc_MLE <- function(v2Data, piGroup, tagRates){
-	# now MLE estimation of proportions\
-	propsMLE <- optim(par = rep(1, nrow(v2Data) * ncol(v2Data)), fn = PBT_var2_optimllh, gr = PBT_var2_grad,
-							piGroup = piGroup, v2Data = v2Data, tagRates = tagRates,
-							control = list(fnscale = -1, maxit = 1000), method = "BFGS"
-					)
+	# now MLE estimation of proportions
+	# starting values: original equal-proportion start, then observed within-row proportions
+	startVals <- list(
+		rep(1, nrow(v2Data) * ncol(v2Data)),
+		as.vector(t(log(v2Data + 0.5)))
+	)
+	fits <- lapply(startVals, function(st){
+		optim(par = st, fn = PBT_var2_optimllh, gr = PBT_var2_grad,
+				piGroup = piGroup, v2Data = v2Data, tagRates = tagRates,
+				control = list(fnscale = -1, maxit = 1000), method = "BFGS"
+		)
+	})
+	# keep the fit with the highest log-likelihood (first start wins ties)
+	propsMLE <- fits[[which.max(vapply(fits, function(x) x$value, numeric(1)))]]
 	if(propsMLE$convergence != 0) warning("Convergence error in PBT_var2_calc_MLE")
 	# apply softmax to translate into probabilities
 	varProbs <- matrix(propsMLE$par, nrow = nrow(v2Data), ncol = ncol(v2Data), byrow = TRUE)
